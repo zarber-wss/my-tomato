@@ -161,6 +161,30 @@ async function saveTaskToSupabase(task: Task) {
   }
 }
 
+async function updateTodoCompleteInSupabase(id: string, completed: boolean) {
+  try {
+    const { error } = await supabase
+      .from("todos")
+      .update({
+        is_completed: completed,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("user_id", STATIC_USER_ID)
+
+    if (error) {
+      console.error("Failed to update task in Supabase:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      })
+    }
+  } catch (e) {
+    console.error("Failed to update task in Supabase:", e)
+  }
+}
+
 async function savePomodoroSessionToSupabase(todoId?: string) {
   try {
     const { error } = await supabase.from("pomodoro_sessions").insert({
@@ -285,6 +309,26 @@ export default function PomodoroApp() {
     }
   }, [tasks, isHydrated])
 
+  // 切回本页面时从云端拉取最新任务，多端同步
+  useEffect(() => {
+    if (!isHydrated) return
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return
+      loadTasksFromSupabase().then((remote) => {
+        if (remote && remote.length >= 0) {
+          setTasks(remote)
+          setSelectedTask((prev) => {
+            const stillExists = prev && remote.some((t) => t.id === prev.id)
+            if (stillExists) return remote.find((t) => t.id === prev!.id) ?? prev
+            return remote.find((t) => !t.completed)
+          })
+        }
+      })
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [isHydrated])
+
   // Handle tab change with scroll to top
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab)
@@ -298,18 +342,22 @@ export default function PomodoroApp() {
   const handleToggleComplete = useCallback((id: string) => {
     const task = tasks.find(t => t.id === id)
     const willComplete = task && !task.completed
-    
+    const newCompleted = task ? !task.completed : false
+
     setTasks((prev) =>
       prev.map((task) =>
         task.id === id
           ? {
               ...task,
-              completed: !task.completed,
-              completedAt: !task.completed ? new Date() : undefined,
+              completed: newCompleted,
+              completedAt: newCompleted ? new Date() : undefined,
             }
           : task
       )
     )
+
+    // 同步到 Supabase，其他端刷新后能看到
+    void updateTodoCompleteInSupabase(id, newCompleted)
 
     // Show celebration when completing a task
     if (willComplete) {
