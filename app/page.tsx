@@ -148,6 +148,7 @@ async function saveTaskToSupabase(task: Task) {
       estimated_pomodoros: task.pomodoroCount,
       completed_pomodoros: task.completedPomodoros ?? 0,
       completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
+      sort_order: 999999,
     })
 
     if (error) {
@@ -248,12 +249,29 @@ async function savePomodoroSessionToSupabase(todoId?: string) {
   }
 }
 
+async function updateTaskOrderInSupabase(orderedIds: string[]) {
+  try {
+    await Promise.all(
+      orderedIds.map((id, index) =>
+        supabase
+          .from("todos")
+          .update({ sort_order: index })
+          .eq("id", id)
+          .eq("user_id", STATIC_USER_ID)
+      )
+    )
+  } catch (e) {
+    console.error("Failed to update task order in Supabase:", e)
+  }
+}
+
 async function loadTasksFromSupabase(): Promise<Task[] | null> {
   try {
     const { data, error } = await supabase
       .from("todos")
-      .select("id,title,description,is_completed,estimated_pomodoros,completed_pomodoros,created_at,updated_at,completed_at")
+      .select("id,title,description,is_completed,estimated_pomodoros,completed_pomodoros,created_at,updated_at,completed_at,sort_order")
       .eq("user_id", STATIC_USER_ID)
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true })
 
     if (error) {
@@ -434,6 +452,8 @@ export default function PomodoroApp() {
 
   const handleReorder = useCallback((newTasks: Task[]) => {
     setTasks(newTasks)
+    const orderedIds = newTasks.map((t) => t.id)
+    void updateTaskOrderInSupabase(orderedIds)
   }, [])
 
   const handleSelectTask = useCallback((task: Task) => {
@@ -516,16 +536,6 @@ export default function PomodoroApp() {
     <div className="min-h-screen bg-background">
       {/* Mobile Container */}
       <div className="max-w-md mx-auto min-h-screen flex flex-col">
-        {/* Header */}
-        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl px-5 py-3 flex items-center justify-end border-b border-border/30">
-          {activeTab === "timer" && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
-              <span className="font-medium">{isHydrated ? `今日${completedPomodoros}/${totalPomodoros}` : "今日 -/-"}</span>
-              <span>🍅</span>
-            </div>
-          )}
-        </header>
-
         {/* Main Content */}
         <main ref={mainRef} className="flex-1 px-5 py-4 pb-24 overflow-y-auto">
           {/* Timer Section - Always render but hide when not active to preserve state */}
@@ -545,6 +555,9 @@ export default function PomodoroApp() {
               {isHydrated ? (
                 <TaskList
                   tasks={tasks}
+                  totalTaskCount={activeTasks.length + todayCompletedTasks.length}
+                  completedPomodoros={completedPomodoros}
+                  totalPomodoros={totalPomodoros}
                   onToggleComplete={handleToggleComplete}
                   onDelete={handleDeleteRequest}
                   onReorder={handleReorder}
