@@ -323,6 +323,10 @@ function loadTasks(): Task[] {
 
 export default function PomodoroApp() {
   const [tasks, setTasks] = useState<Task[]>(defaultTasks)
+  const tasksRef = useRef<Task[]>(tasks)
+  useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
   const [selectedTask, setSelectedTask] = useState<Task | undefined>()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -500,21 +504,25 @@ export default function PomodoroApp() {
   }, [])
 
   const handlePomodoroComplete = useCallback(() => {
-    if (selectedTask) {
-      const newCount = Math.min(selectedTask.completedPomodoros + 1, selectedTask.pomodoroCount)
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === selectedTask.id ? { ...task, completedPomodoros: newCount } : task
+    const taskId = selectedTask?.id
+    if (taskId) {
+      const task = tasksRef.current.find((t) => t.id === taskId)
+      if (task) {
+        const newCount = Math.min(task.completedPomodoros + 1, task.pomodoroCount)
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId ? { ...t, completedPomodoros: newCount } : t
+          )
         )
-      )
-      void updateTodoPomodorosInSupabase(selectedTask.id, newCount)
-      void savePomodoroSessionToSupabase(selectedTask.id)
+        void updateTodoPomodorosInSupabase(taskId, newCount)
+        void savePomodoroSessionToSupabase(taskId)
+      }
       timerRef.current?.switchToShortBreak()
     } else {
       void savePomodoroSessionToSupabase(undefined)
       timerRef.current?.switchToShortBreak()
     }
-  }, [selectedTask])
+  }, [selectedTask?.id])
 
   // Get today's date at midnight for filtering
   const today = new Date()
@@ -598,10 +606,10 @@ export default function PomodoroApp() {
                 专注
               </button>
               
-              {/* Add Task Button - Center Rounded Rectangle, Elevated, Pink */}
+              {/* Add Task Button - 宽度+1/2、白底阴影拟物风、+ 粉色 */}
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="mx-1 px-6 h-12 bg-pink-400 text-white rounded-xl font-medium flex items-center justify-center shadow-[0_4px_16px_rgba(244,114,182,0.4)] active:scale-95 transition-all"
+                className="mx-1 min-w-[7.5rem] px-9 h-12 bg-white text-pink-500 rounded-xl font-medium flex items-center justify-center border border-gray-200/90 shadow-[0_4px_0_0_rgba(0,0,0,0.06),0_6px_12px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:shadow-[0_1px_0_0_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] active:translate-y-0.5 transition-all"
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>

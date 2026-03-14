@@ -109,10 +109,12 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
             setOvertimeSeconds(0)
             onComplete?.()
           } else if (timeLeft === 0 && mode !== "pomodoro") {
-            // For short/long break, auto reset when finished
+            // 短/长休息结束后切回专注模式，显示 25 分钟
+            setMode("pomodoro")
+            setTimeLeft(TIMER_MODES.pomodoro.time)
             setIsRunning(false)
             setHasStarted(false)
-            setTimeLeft(TIMER_MODES[mode].time)
+            onModeChange?.("pomodoro")
           }
         }, 1000)
       }
@@ -120,7 +122,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       return () => {
         if (interval) clearInterval(interval)
       }
-    }, [isRunning, timeLeft, mode, isOvertime, onComplete])
+    }, [isRunning, timeLeft, mode, isOvertime, onComplete, onModeChange])
 
     const currentModeConfig = TIMER_MODES[mode]
 
