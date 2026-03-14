@@ -16,29 +16,6 @@ type TabType = "timer" | "history"
 const STORAGE_KEY = "pomodoro-tasks"
 const STATIC_USER_ID = "00000000-0000-0000-0000-000000000001"
 
-// Greetings for different times of day
-const GREETINGS = {
-  morning: ["早上好，开启元气满满的一天！", "早安，今天也要加油哦！", "美好的早晨，准备好大干一场了吗？"],
-  afternoon: ["下午好，继续保持专注！", "午后时光，效率满满！", "下午茶时间，但先完成任务吧！"],
-  evening: ["晚上好，今天辛苦了！", "傍晚时分，收尾工作中！", "晚安前，再冲刺一下！"],
-  night: ["夜深了，注意休息哦！", "别熬太晚，身体重要！", "夜猫子模式启动！"],
-}
-
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  let greetings: string[]
-  if (hour >= 5 && hour < 12) {
-    greetings = GREETINGS.morning
-  } else if (hour >= 12 && hour < 18) {
-    greetings = GREETINGS.afternoon
-  } else if (hour >= 18 && hour < 22) {
-    greetings = GREETINGS.evening
-  } else {
-    greetings = GREETINGS.night
-  }
-  return greetings[Math.floor(Math.random() * greetings.length)]
-}
-
 // Demo data with some history
 const defaultTasks: Task[] = [
   {
@@ -337,7 +314,6 @@ export default function PomodoroApp() {
     isOpen: false,
     taskId: null,
   })
-  const [greeting, setGreeting] = useState("")
   const timerRef = useRef<PomodoroTimerRef>(null)
   const mainRef = useRef<HTMLElement>(null)
 
@@ -356,7 +332,6 @@ export default function PomodoroApp() {
       if (firstActiveTask) {
         setSelectedTask(firstActiveTask)
       }
-      setGreeting(getGreeting())
       setIsHydrated(true)
     }
 

@@ -148,19 +148,19 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
           </div>
         </div>
 
-        {/* Large Time Display - Centered */}
+        {/* Large Time Display - Centered（倒计时数字使用 Baloo 2） */}
         <div className="flex flex-col items-center">
           {isOvertime ? (
             <div className="flex flex-col items-center">
-              <span className={cn("text-7xl font-bold tracking-tight font-mono", currentModeConfig.textColor)}>
+              <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.12em]", currentModeConfig.textColor)}>
                 {formatTime(0)}
               </span>
-              <span className={cn("text-lg font-medium mt-1", currentModeConfig.textColor)}>
+              <span className={cn("font-timer-digits text-lg font-medium mt-1 tracking-[0.08em]", currentModeConfig.textColor)}>
                 +{formatTime(overtimeSeconds)}
               </span>
             </div>
           ) : (
-            <span className={cn("text-7xl font-bold tracking-tight font-mono", currentModeConfig.textColor)}>
+            <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.12em]", currentModeConfig.textColor)}>
               {formatTime(timeLeft)}
             </span>
           )}

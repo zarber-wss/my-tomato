@@ -80,6 +80,11 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* 番茄钟倒计时数字使用 Baloo 2（由 layout 注入 --font-baloo2） */
+.font-timer-digits {
+  font-family: var(--font-baloo2), sans-serif;
+}
+
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';

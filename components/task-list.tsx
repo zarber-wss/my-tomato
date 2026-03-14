@@ -49,8 +49,6 @@ export function TaskList({
 }: TaskListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [isSortMode, setIsSortMode] = useState(false)
-  const [touchStartY, setTouchStartY] = useState<number | null>(null)
-  const [touchCurrentY, setTouchCurrentY] = useState<number | null>(null)
   const [newTaskId, setNewTaskId] = useState<string | null>(null)
   const [actionsTaskId, setActionsTaskId] = useState<string | null>(null)
   /** 仅用于浮动卡首次渲染位置，拖拽中通过 ref 直接改 DOM 避免卡顿 */
@@ -182,8 +180,6 @@ export function TaskList({
     setDraggedIndex(index)
     const ty = e.touches[0].clientY
     const tx = e.touches[0].clientX
-    setTouchStartY(ty)
-    setTouchCurrentY(ty)
     const x = listRef.current
       ? listRef.current.getBoundingClientRect().left + listRef.current.getBoundingClientRect().width / 2
       : tx
@@ -196,7 +192,6 @@ export function TaskList({
     e.preventDefault()
     const touchY = e.touches[0].clientY
     const touchX = e.touches[0].clientX
-    setTouchCurrentY(touchY)
     if (floatingCardRef.current) {
       const x = listRef.current ? listRef.current.getBoundingClientRect().left + listRef.current.getBoundingClientRect().width / 2 : touchX
       floatingCardRef.current.style.left = `${x}px`
@@ -216,8 +211,6 @@ export function TaskList({
       onReorder([...newTasks, ...completedTasks])
     }
     setDraggedIndex(null)
-    setTouchStartY(null)
-    setTouchCurrentY(null)
     setInitialDragPosition(null)
     dragOverIndexRef.current = null
     if (dropIndicatorRef.current) dropIndicatorRef.current.style.display = "none"
