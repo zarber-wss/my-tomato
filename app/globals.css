@@ -80,9 +80,9 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
-/* 番茄钟倒计时数字使用 Baloo 2（由 layout 注入 --font-baloo2） */
+/* 番茄钟倒计时数字使用 Rubik（由 layout 注入 --font-rubik） */
 .font-timer-digits {
-  font-family: var(--font-baloo2), sans-serif;
+  font-family: var(--font-rubik), sans-serif;
 }
 
 @theme inline {

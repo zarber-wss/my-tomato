@@ -9,6 +9,10 @@ interface TaskActionsSheetProps {
   onComplete: (id: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  /** 今日待办时显示，调整到未来待办 */
+  onMoveToFuture?: (id: string) => void
+  /** 未来待办时显示，添加到今日待办 */
+  onAddToToday?: (id: string) => void
 }
 
 export function TaskActionsSheet({
@@ -18,8 +22,12 @@ export function TaskActionsSheet({
   onComplete,
   onEdit,
   onDelete,
+  onMoveToFuture,
+  onAddToToday,
 }: TaskActionsSheetProps) {
   if (!isOpen || !task) return null
+
+  const isFutureTask = task.createdAt == null
 
   const handleComplete = () => {
     onComplete(task.id)
@@ -33,6 +41,16 @@ export function TaskActionsSheet({
 
   const handleDelete = () => {
     onDelete(task.id)
+    onClose()
+  }
+
+  const handleMoveToFuture = () => {
+    onMoveToFuture?.(task.id)
+    onClose()
+  }
+
+  const handleAddToToday = () => {
+    onAddToToday?.(task.id)
     onClose()
   }
 
@@ -57,23 +75,46 @@ export function TaskActionsSheet({
             <p className="text-sm text-muted-foreground mt-1">{task.notes}</p>
           ) : null}
         </div>
-        {/* 三个操作按钮：仅文字、高度+1/4、间距+2px */}
+        {/* 操作按钮：未来任务展示 添加到今日待办、修改任务、删除；今日任务展示 完成任务、修改任务、调整到未来待办、删除 */}
         <div className="p-6 pt-4 flex-1 overflow-y-auto space-y-[14px]">
-          {!task.completed && (
+          {isFutureTask && onAddToToday && (
             <button
-              onClick={handleComplete}
-              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium text-white transition-colors hover:opacity-90 active:scale-[0.98]"
-              style={{ backgroundColor: "#3473B5" }}
+              onClick={handleAddToToday}
+              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium bg-primary text-primary-foreground transition-colors hover:opacity-90 active:scale-[0.98]"
             >
-              完成任务
+              添加到今日待办
             </button>
           )}
-          {!task.completed && (
+          {isFutureTask && (
             <button
               onClick={handleEdit}
               className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium text-foreground bg-muted hover:bg-muted/80 transition-colors active:scale-[0.98]"
             >
               修改任务
+            </button>
+          )}
+          {!isFutureTask && !task.completed && (
+            <button
+              onClick={handleComplete}
+              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium bg-primary text-primary-foreground transition-colors hover:opacity-90 active:scale-[0.98]"
+            >
+              完成任务
+            </button>
+          )}
+          {!isFutureTask && !task.completed && (
+            <button
+              onClick={handleEdit}
+              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium text-foreground bg-muted hover:bg-muted/80 transition-colors active:scale-[0.98]"
+            >
+              修改任务
+            </button>
+          )}
+          {!isFutureTask && !task.completed && task.createdAt != null && onMoveToFuture && (
+            <button
+              onClick={handleMoveToFuture}
+              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium text-foreground bg-muted hover:bg-muted/80 transition-colors active:scale-[0.98]"
+            >
+              调整到未来待办
             </button>
           )}
           <button

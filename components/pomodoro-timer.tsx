@@ -91,7 +91,8 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         // 不调用 resetTimer()，由父组件 switchToShortBreak() 切到短休息并设置 5 分钟
         return
       }
-      resetTimer()
+      // 短休息/长休息 点击「完成」时切回专注模式，倒计时 25 分钟
+      handleModeChange("pomodoro")
     }
 
     useEffect(() => {
@@ -129,7 +130,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
     return (
       <div className="bg-card rounded-3xl px-4 py-6 shadow-sm">
         {/* Mode Tabs - Horizontal layout at top */}
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-8">
           <div className="inline-flex bg-secondary rounded-xl p-1">
             {(Object.keys(TIMER_MODES) as TimerMode[]).map((m) => (
               <button
@@ -148,26 +149,26 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
           </div>
         </div>
 
-        {/* Large Time Display - Centered（倒计时数字使用 Baloo 2） */}
-        <div className="flex flex-col items-center">
+        {/* Large Time Display - Centered（倒计时数字字体在 globals 中设置） */}
+        <div className="flex flex-col items-center my-8">
           {isOvertime ? (
             <div className="flex flex-col items-center">
-              <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.12em]", currentModeConfig.textColor)}>
+              <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
                 {formatTime(0)}
               </span>
-              <span className={cn("font-timer-digits text-lg font-medium mt-1 tracking-[0.08em]", currentModeConfig.textColor)}>
+              <span className={cn("font-timer-digits text-lg font-medium mt-1 tracking-[0.04em]", currentModeConfig.textColor)}>
                 +{formatTime(overtimeSeconds)}
               </span>
             </div>
           ) : (
-            <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.12em]", currentModeConfig.textColor)}>
+            <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
               {formatTime(timeLeft)}
             </span>
           )}
         </div>
 
         {/* Control Buttons - Below timer */}
-        <div className="mt-8 flex items-center justify-center h-11">
+        <div className="flex items-center justify-center h-11">
           {isOvertime ? (
             // Overtime mode: only show centered "Complete" button
             <button
@@ -231,7 +232,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         {currentTask && (
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">当前任务</p>
-            <p className="text-xl font-medium text-foreground mt-1">{currentTask}</p>
+            <p className="text-base font-medium text-foreground mt-1">{currentTask}</p>
           </div>
         )}
       </div>

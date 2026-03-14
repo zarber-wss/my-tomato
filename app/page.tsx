@@ -25,6 +25,7 @@ const defaultTasks: Task[] = [
     pomodoroCount: 4,
     completedPomodoros: 1,
     completed: false,
+    createdAt: new Date(),
   },
   {
     id: "2",
@@ -32,12 +33,21 @@ const defaultTasks: Task[] = [
     pomodoroCount: 2,
     completedPomodoros: 0,
     completed: false,
+    createdAt: new Date(),
   },
   {
     id: "3",
     name: "团队周会准备",
     notes: "准备本周工作汇报PPT",
     pomodoroCount: 1,
+    completedPomodoros: 0,
+    completed: false,
+    createdAt: new Date(),
+  },
+  {
+    id: "future-1",
+    name: "下周要做的某事",
+    pomodoroCount: 2,
     completedPomodoros: 0,
     completed: false,
   },
@@ -48,6 +58,7 @@ const defaultTasks: Task[] = [
     completedPomodoros: 1,
     completed: true,
     completedAt: new Date(),
+    createdAt: new Date(),
   },
   {
     id: "4",
@@ -125,6 +136,7 @@ async function saveTaskToSupabase(task: Task) {
       estimated_pomodoros: task.pomodoroCount,
       completed_pomodoros: task.completedPomodoros ?? 0,
       completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
+      created_at: task.createdAt ? task.createdAt.toISOString() : null,
       sort_order: 999999,
     })
 
@@ -179,6 +191,21 @@ async function updateTodoPomodorosInSupabase(id: string, completedPomodoros: num
     }
   } catch (e) {
     console.error("Failed to update task pomodoros in Supabase:", e)
+  }
+}
+
+async function updateTaskCreatedAtInSupabase(id: string, createdAt: Date | null) {
+  try {
+    const { error } = await supabase
+      .from("todos")
+      .update({ created_at: createdAt ? createdAt.toISOString() : null })
+      .eq("id", id)
+      .eq("user_id", STATIC_USER_ID)
+    if (error) {
+      console.error("Failed to update task created_at in Supabase:", error.message)
+    }
+  } catch (e) {
+    console.error("Failed to update task created_at in Supabase:", e)
   }
 }
 
@@ -272,6 +299,7 @@ async function loadTasksFromSupabase(): Promise<Task[] | null> {
         completedPomodoros: row.completed_pomodoros ?? 0,
         completed,
         completedAt: completedAtRaw ? new Date(completedAtRaw) : undefined,
+        createdAt: row.created_at ? new Date(row.created_at) : undefined,
       }
     })
   } catch (e) {
@@ -289,7 +317,8 @@ function loadTasks(): Task[] {
       const parsed = JSON.parse(saved)
       return parsed.map((task: Task) => ({
         ...task,
-        completedAt: task.completedAt ? new Date(task.completedAt) : undefined
+        completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+        createdAt: task.createdAt ? new Date(task.createdAt) : undefined,
       }))
     }
   } catch (e) {
@@ -328,7 +357,7 @@ export default function PomodoroApp() {
 
       if (cancelled) return
       setTasks(loadedTasks)
-      const firstActiveTask = loadedTasks.find((t) => !t.completed)
+      const firstActiveTask = loadedTasks.find((t) => !t.completed && t.createdAt != null)
       if (firstActiveTask) {
         setSelectedTask(firstActiveTask)
       }
@@ -361,8 +390,8 @@ export default function PomodoroApp() {
           setTasks(remote)
           setSelectedTask((prev) => {
             const stillExists = prev && remote.some((t) => t.id === prev.id)
-            if (stillExists) return remote.find((t) => t.id === prev!.id) ?? prev
-            return remote.find((t) => !t.completed)
+            if (stillExists)             return remote.find((t) => t.id === prev!.id) ?? prev
+            return remote.find((t) => !t.completed && t.createdAt != null)
           })
         }
       })
@@ -446,7 +475,7 @@ export default function PomodoroApp() {
     setIsModalOpen(true)
   }, [])
 
-  const handleAddTask = useCallback((name: string, pomodoroCount: number, notes?: string) => {
+  const handleAddTask = useCallback((name: string, pomodoroCount: number, notes?: string, isToday = true) => {
     if (editingTask) {
       setTasks((prev) =>
         prev.map((task) =>
@@ -456,26 +485,54 @@ export default function PomodoroApp() {
         )
       )
       setEditingTask(null)
-    } else {
-      const newTask: Task = {
-        id: generateUuid(),
-        name,
-        notes,
-        pomodoroCount,
-        completedPomodoros: 0,
-        completed: false,
-      }
-      setTasks((prev) => [...prev.filter((t) => !t.completed), newTask, ...prev.filter((t) => t.completed)])
-      void saveTaskToSupabase(newTask)
-      if (!selectedTask) {
-        setSelectedTask(newTask)
-      }
+      void saveTaskToSupabase(tasks.find((t) => t.id === editingTask.id)!)
+      return
+    }
+    const newTask: Task = {
+      id: generateUuid(),
+      name,
+      notes,
+      pomodoroCount,
+      completedPomodoros: 0,
+      completed: false,
+      createdAt: isToday ? new Date() : undefined,
+    }
+    setTasks((prev) => {
+      const active = prev.filter((t) => !t.completed && t.createdAt != null)
+      const completed = prev.filter((t) => t.completed)
+      const future = prev.filter((t) => !t.completed && t.createdAt == null)
+      if (isToday) return [...active, newTask, ...completed, ...future]
+      return [...active, ...completed, ...future, newTask]
+    })
+    void saveTaskToSupabase(newTask)
+    if (isToday && !selectedTask) {
+      setSelectedTask(newTask)
     }
   }, [selectedTask, editingTask])
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false)
     setEditingTask(null)
+  }, [])
+
+  const handleMoveToFuture = useCallback((id: string) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, createdAt: undefined } : t)))
+    void updateTaskCreatedAtInSupabase(id, null)
+  }, [])
+
+  const handleAddToToday = useCallback((id: string) => {
+    const now = new Date()
+    setTasks((prev) => {
+      const task = prev.find((t) => t.id === id)
+      if (!task) return prev
+      const updated = { ...task, createdAt: now }
+      const rest = prev.filter((t) => t.id !== id)
+      const active = rest.filter((t) => !t.completed && t.createdAt != null)
+      const completed = rest.filter((t) => t.completed)
+      const future = rest.filter((t) => !t.completed && t.createdAt == null)
+      return [...active, updated, ...completed, ...future]
+    })
+    void updateTaskCreatedAtInSupabase(id, now)
   }, [])
 
   const handlePomodoroComplete = useCallback(() => {
@@ -503,7 +560,7 @@ export default function PomodoroApp() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const activeTasks = tasks.filter((t) => !t.completed)
+  const activeTasks = tasks.filter((t) => !t.completed && t.createdAt != null)
   const todayCompletedTasks = tasks.filter((t) => {
     if (!t.completed || !t.completedAt) return false
     const completedDate = new Date(t.completedAt)
@@ -546,6 +603,8 @@ export default function PomodoroApp() {
                   onReorder={handleReorder}
                   onSelectTask={handleSelectTask}
                   onEditTask={handleEditTask}
+                  onMoveToFuture={handleMoveToFuture}
+                  onAddToToday={handleAddToToday}
                   selectedTaskId={selectedTask?.id}
                 />
               ) : (
@@ -567,12 +626,12 @@ export default function PomodoroApp() {
         {/* Floating Bottom Tab Bar - Apple Liquid Glass Style */}
         <div className="fixed bottom-0 left-0 right-0 pb-6 px-4 pointer-events-none z-50">
           <div className="max-w-md mx-auto">
-            <div className="pointer-events-auto bg-white/70 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_0_0_1px_rgba(255,255,255,0.5)] p-1.5 flex items-center justify-between h-14">
+            <div className="pointer-events-auto bg-white/70 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_0_0_1px_rgba(255,255,255,0.5)] p-1.5 grid grid-cols-[2.5fr_1fr_2.5fr] items-center gap-1 h-14">
               {/* Focus Tab */}
               <button
                 onClick={() => handleTabChange("timer")}
                 className={cn(
-                  "flex-1 h-full flex items-center justify-center rounded-xl transition-all text-sm font-medium",
+                  "h-full flex items-center justify-center rounded-xl transition-all text-sm font-medium",
                   activeTab === "timer"
                     ? "text-foreground"
                     : "text-muted-foreground"
@@ -581,10 +640,10 @@ export default function PomodoroApp() {
                 专注
               </button>
               
-              {/* Add Task Button - 宽度+1/2、白底阴影拟物风、+ 粉色 */}
+              {/* Add Task Button - 宽度约 1/6（当前 2/3 的 1/4）、白底阴影拟物风、+ 粉色 */}
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="mx-1 min-w-[7.5rem] px-9 h-12 bg-white text-pink-500 rounded-xl font-medium flex items-center justify-center border border-gray-200/90 shadow-[0_4px_0_0_rgba(0,0,0,0.06),0_6px_12px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:shadow-[0_1px_0_0_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] active:translate-y-0.5 transition-all"
+                className="w-full h-full min-h-0 bg-white text-pink-500 rounded-xl font-medium flex items-center justify-center border border-gray-200/90 shadow-[0_4px_0_0_rgba(0,0,0,0.06),0_6px_12px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:shadow-[0_1px_0_0_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] active:translate-y-0.5 transition-all"
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
@@ -596,7 +655,7 @@ export default function PomodoroApp() {
               <button
                 onClick={() => handleTabChange("history")}
                 className={cn(
-                  "flex-1 h-full flex items-center justify-center rounded-xl transition-all text-sm font-medium",
+                  "h-full flex items-center justify-center rounded-xl transition-all text-sm font-medium",
                   activeTab === "history"
                     ? "text-foreground"
                     : "text-muted-foreground"

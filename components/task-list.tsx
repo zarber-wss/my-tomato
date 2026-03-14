@@ -13,9 +13,12 @@ export interface Task {
   completedPomodoros: number
   completed: boolean
   completedAt?: Date
+  /** 有值表示今日待办，null/undefined 表示未来待办 */
+  createdAt?: Date | null
 }
 
 interface TaskListProps {
+  /** 所有任务（今日+未来），组件内按 createdAt 拆成今日待办 / 未来待办 */
   tasks: Task[]
   totalTaskCount?: number
   completedPomodoros?: number
@@ -25,6 +28,10 @@ interface TaskListProps {
   onReorder: (tasks: Task[]) => void
   onSelectTask: (task: Task) => void
   onEditTask: (task: Task) => void
+  /** 今日待办 → 调整到未来待办 */
+  onMoveToFuture?: (id: string) => void
+  /** 未来待办 → 添加到今日待办（追加到今日最后） */
+  onAddToToday?: (id: string) => void
   selectedTaskId?: string
 }
 
@@ -45,6 +52,8 @@ export function TaskList({
   onReorder,
   onSelectTask,
   onEditTask,
+  onMoveToFuture,
+  onAddToToday,
   selectedTaskId,
 }: TaskListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
@@ -84,14 +93,17 @@ export function TaskList({
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // Filter tasks: uncompleted + completed today
-  const activeTasks = tasks.filter((t) => !t.completed)
+  // 今日待办：未完成且存在 createdAt
+  const activeTasks = tasks.filter((t) => !t.completed && t.createdAt != null)
+  // 今日已完成：已完成且完成日是今天
   const todayCompletedTasks = tasks.filter((t) => {
     if (!t.completed || !t.completedAt) return false
     const completedDate = new Date(t.completedAt)
     completedDate.setHours(0, 0, 0, 0)
     return completedDate.getTime() === today.getTime()
   })
+  // 未来待办：未完成且无 createdAt
+  const futureTasks = tasks.filter((t) => !t.completed && (t.createdAt == null || t.createdAt === undefined))
 
   const updateDropIndicator = (clientY: number, draggedIdx: number | null) => {
     if (!listRef.current || !dropIndicatorRef.current) return
@@ -161,7 +173,7 @@ export function TaskList({
       const insertAt = dropIndex > draggedIndex ? dropIndex - 1 : dropIndex
       newTasks.splice(insertAt, 0, draggedItem)
       const completedTasks = tasks.filter((t) => t.completed)
-      onReorder([...newTasks, ...completedTasks])
+      onReorder([...newTasks, ...completedTasks, ...futureTasks])
     }
     setDraggedIndex(null)
     setInitialDragPosition(null)
@@ -208,7 +220,7 @@ export function TaskList({
       const insertAt = dropIndex > draggedIndex ? dropIndex - 1 : dropIndex
       newTasks.splice(insertAt, 0, draggedItem)
       const completedTasks = tasks.filter((t) => t.completed)
-      onReorder([...newTasks, ...completedTasks])
+      onReorder([...newTasks, ...completedTasks, ...futureTasks])
     }
     setDraggedIndex(null)
     setInitialDragPosition(null)
@@ -339,14 +351,16 @@ export function TaskList({
         onComplete={onToggleComplete}
         onEdit={onEditTask}
         onDelete={onDelete}
+        onMoveToFuture={onMoveToFuture}
+        onAddToToday={onAddToToday}
       />
       <div
         ref={listRef}
         className="flex flex-col gap-3"
         onDragOver={handleDragOver}
       >
-      {/* Header: 今日待办 + n个任务 已完成x/y🍅 在左侧，排序在右侧 */}
-      <div className="flex items-center justify-between mb-1">
+      {/* Header: 今日待办 + n个任务 已完成x/y🍅 在左侧，排序在右侧（上下间距为原 1.5 倍） */}
+      <div className="flex items-center justify-between my-1.5">
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold text-foreground">今日待办</h2>
           <span className="text-xs text-muted-foreground">
@@ -432,6 +446,40 @@ export function TaskList({
             </div>
           )}
           {todayCompletedTasks.map((task, index) => renderTaskCard(task, index, true))}
+        </>
+      )}
+
+      {/* 未来待办 - 未完成且无 createdAt，标题与今日待办一致：居左、黑色；卡片统一浅蓝，仅右侧「…」打开浮层 */}
+      {!isSortMode && futureTasks.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 my-1.5 mt-4">
+            <h2 className="text-base font-semibold text-foreground">未来待办</h2>
+            <span className="text-xs text-muted-foreground">{futureTasks.length}个任务</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {futureTasks.map((task) => (
+              <div
+                key={task.id}
+                className="rounded-2xl px-4 py-3.5 border-2 border-blue-200/60 bg-blue-50 shadow-md shadow-blue-200/30 transition-all duration-200"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium break-words text-foreground">{task.name}</p>
+                    {task.notes?.trim() && (
+                      <p className="text-sm text-foreground/60 mt-1 line-clamp-2">{task.notes}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setActionsTaskId(task.id)}
+                    className="flex-shrink-0 p-2 rounded-lg text-muted-foreground hover:bg-blue-100/80 hover:text-foreground transition-colors"
+                    aria-label="更多操作"
+                  >
+                    <MoreVertical size={20} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>

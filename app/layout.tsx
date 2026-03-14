@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Nunito, Baloo_2 } from 'next/font/google'
+import { Nunito, Rubik } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
@@ -9,9 +9,9 @@ const nunito = Nunito({
   display: 'swap',
 })
 
-const baloo2 = Baloo_2({
+const rubik = Rubik({
   subsets: ['latin'],
-  variable: '--font-baloo2',
+  variable: '--font-rubik',
   display: 'swap',
 })
 
@@ -38,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${nunito.className} ${baloo2.variable} antialiased`}>
+      <body className={`${nunito.className} ${rubik.variable} antialiased`}>
         {children}
         <Toaster />
         <Analytics />
