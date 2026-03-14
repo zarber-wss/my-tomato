@@ -68,11 +68,13 @@ export function TaskActionsSheet({
         <div className="flex justify-center pt-4 pb-4 flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
-        {/* 任务名称与备注 */}
+        {/* 任务名称与备注：备注最多 2 行截断，保留换行 */}
         <div className="px-6 pb-4 border-b border-border/30 flex-shrink-0">
           <h2 className="text-xl font-bold text-foreground">{task.name}</h2>
           {task.notes && task.notes.trim() ? (
-            <p className="text-sm text-muted-foreground mt-1">{task.notes}</p>
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 overflow-hidden text-ellipsis whitespace-pre-wrap break-words">
+              {task.notes}
+            </p>
           ) : null}
         </div>
         {/* 操作按钮：未来任务展示 添加到今日待办、修改任务、删除；今日任务展示 完成任务、修改任务、调整到未来待办、删除 */}

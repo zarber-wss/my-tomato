@@ -466,7 +466,9 @@ export function TaskList({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium break-words text-foreground">{task.name}</p>
                     {task.notes?.trim() && (
-                      <p className="text-sm text-foreground/60 mt-1 line-clamp-2">{task.notes}</p>
+                      <p className="text-sm text-foreground/60 mt-1 line-clamp-2 overflow-hidden text-ellipsis whitespace-pre-wrap break-words">
+                        {task.notes}
+                      </p>
                     )}
                   </div>
                   <button

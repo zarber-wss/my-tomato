@@ -125,7 +125,10 @@ function generateUuid() {
   })
 }
 
-async function saveTaskToSupabase(task: Task) {
+async function saveTaskToSupabase(
+  task: Task,
+  onError?: (message: string) => void
+): Promise<boolean> {
   try {
     const { error } = await supabase.from("todos").insert({
       id: task.id,
@@ -147,9 +150,14 @@ async function saveTaskToSupabase(task: Task) {
         hint: error.hint,
         code: error.code,
       })
+      onError?.(error.message)
+      return false
     }
+    return true
   } catch (e) {
     console.error("Failed to save task to Supabase:", e)
+    onError?.(e instanceof Error ? e.message : "保存失败")
+    return false
   }
 }
 
@@ -390,7 +398,7 @@ export default function PomodoroApp() {
           setTasks(remote)
           setSelectedTask((prev) => {
             const stillExists = prev && remote.some((t) => t.id === prev.id)
-            if (stillExists)             return remote.find((t) => t.id === prev!.id) ?? prev
+            if (stillExists) return remote.find((t) => t.id === prev!.id) ?? prev
             return remote.find((t) => !t.completed && t.createdAt != null)
           })
         }
@@ -398,6 +406,38 @@ export default function PomodoroApp() {
     }
     document.addEventListener("visibilitychange", onVisible)
     return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [isHydrated])
+
+  // Supabase Realtime：监听 todos 表变更，多端实时同步（电脑端添加/修改/删除后移动端自动更新）
+  useEffect(() => {
+    if (!isHydrated) return
+    const channel = supabase
+      .channel("todos-sync")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "todos",
+          filter: `user_id=eq.${STATIC_USER_ID}`,
+        },
+        () => {
+          loadTasksFromSupabase().then((remote) => {
+            if (remote) {
+              setTasks(remote)
+              setSelectedTask((prev) => {
+                const stillExists = prev && remote.some((t) => t.id === prev.id)
+                if (stillExists) return remote.find((t) => t.id === prev!.id) ?? prev
+                return remote.find((t) => !t.completed && t.createdAt != null)
+              })
+            }
+          })
+        }
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   }, [isHydrated])
 
   // Handle tab change with scroll to top
@@ -485,7 +525,12 @@ export default function PomodoroApp() {
         )
       )
       setEditingTask(null)
-      void saveTaskToSupabase(tasks.find((t) => t.id === editingTask.id)!)
+      void saveTaskToSupabase(tasks.find((t) => t.id === editingTask.id)!, (msg) =>
+        toast({
+          description: `同步到云端失败：${msg}`,
+          variant: "destructive",
+        })
+      )
       return
     }
     const newTask: Task = {
@@ -504,9 +549,23 @@ export default function PomodoroApp() {
       if (isToday) return [...active, newTask, ...completed, ...future]
       return [...active, ...completed, ...future, newTask]
     })
-    void saveTaskToSupabase(newTask)
+    toast({
+      description: "已创建",
+      className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto min-w-0 bg-foreground/80 text-background text-sm font-medium px-6 py-2.5 rounded-full shadow-lg backdrop-blur-sm border-0",
+    })
+    void saveTaskToSupabase(newTask, (msg) =>
+      toast({
+        description: `任务已保存到本地，但同步到云端失败：${msg}`,
+        variant: "destructive",
+      })
+    )
     if (isToday && !selectedTask) {
       setSelectedTask(newTask)
+    }
+    if (!isToday && mainRef.current) {
+      setTimeout(() => {
+        mainRef.current?.scrollTo({ top: mainRef.current.scrollHeight, behavior: "smooth" })
+      }, 150)
     }
   }, [selectedTask, editingTask])
 
