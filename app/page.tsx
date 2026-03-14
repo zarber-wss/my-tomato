@@ -146,6 +146,7 @@ async function saveTaskToSupabase(task: Task) {
       description: task.notes ?? null,
       is_completed: task.completed,
       estimated_pomodoros: task.pomodoroCount,
+      completed_pomodoros: task.completedPomodoros ?? 0,
       completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
     })
 
@@ -185,6 +186,21 @@ async function updateTodoCompleteInSupabase(id: string, completed: boolean) {
     }
   } catch (e) {
     console.error("Failed to update task in Supabase:", e)
+  }
+}
+
+async function updateTodoPomodorosInSupabase(id: string, completedPomodoros: number) {
+  try {
+    const { error } = await supabase
+      .from("todos")
+      .update({ completed_pomodoros: completedPomodoros })
+      .eq("id", id)
+      .eq("user_id", STATIC_USER_ID)
+    if (error) {
+      console.error("Failed to update task pomodoros in Supabase:", error.message)
+    }
+  } catch (e) {
+    console.error("Failed to update task pomodoros in Supabase:", e)
   }
 }
 
@@ -236,7 +252,7 @@ async function loadTasksFromSupabase(): Promise<Task[] | null> {
   try {
     const { data, error } = await supabase
       .from("todos")
-      .select("id,title,description,is_completed,estimated_pomodoros,created_at,updated_at,completed_at")
+      .select("id,title,description,is_completed,estimated_pomodoros,completed_pomodoros,created_at,updated_at,completed_at")
       .eq("user_id", STATIC_USER_ID)
       .order("created_at", { ascending: true })
 
@@ -258,7 +274,7 @@ async function loadTasksFromSupabase(): Promise<Task[] | null> {
         name: row.title,
         notes: row.description ?? undefined,
         pomodoroCount: row.estimated_pomodoros ?? 1,
-        completedPomodoros: 0,
+        completedPomodoros: row.completed_pomodoros ?? 0,
         completed,
         completedAt: completedAtRaw ? new Date(completedAtRaw) : undefined,
       }
@@ -465,23 +481,18 @@ export default function PomodoroApp() {
 
   const handlePomodoroComplete = useCallback(() => {
     if (selectedTask) {
+      const newCount = Math.min(selectedTask.completedPomodoros + 1, selectedTask.pomodoroCount)
       setTasks((prev) =>
         prev.map((task) =>
-          task.id === selectedTask.id
-            ? {
-                ...task,
-                completedPomodoros: Math.min(
-                  task.completedPomodoros + 1,
-                  task.pomodoroCount
-                ),
-              }
-            : task
+          task.id === selectedTask.id ? { ...task, completedPomodoros: newCount } : task
         )
       )
+      void updateTodoPomodorosInSupabase(selectedTask.id, newCount)
       void savePomodoroSessionToSupabase(selectedTask.id)
       timerRef.current?.switchToShortBreak()
     } else {
       void savePomodoroSessionToSupabase(undefined)
+      timerRef.current?.switchToShortBreak()
     }
   }, [selectedTask])
 

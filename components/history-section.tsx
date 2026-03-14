@@ -34,21 +34,21 @@ function formatDate(date: Date): string {
 
 function getDateKey(date: Date): string {
   const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = (d.getMonth() + 1).toString().padStart(2, "0")
+  const day = d.getDate().toString().padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 function groupTasksByDate(tasks: Task[]): Map<string, { displayDate: string; tasks: Task[] }> {
   const groups = new Map<string, { displayDate: string; tasks: Task[] }>()
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
+  const todayKey = getDateKey(new Date())
+
   tasks
     .filter((task) => {
       if (!task.completed || !task.completedAt) return false
-      const completedDate = new Date(task.completedAt)
-      completedDate.setHours(0, 0, 0, 0)
-      return completedDate < today
+      const completedKey = getDateKey(task.completedAt)
+      return completedKey < todayKey
     })
     .sort((a, b) => {
       const dateA = new Date(a.completedAt!).getTime()

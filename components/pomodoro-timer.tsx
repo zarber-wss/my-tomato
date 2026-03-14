@@ -86,9 +86,10 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
     }
 
     const completePomodoroEarly = () => {
-      // Complete this pomodoro (not the entire task)
       if (mode === "pomodoro") {
         onPomodoroComplete?.()
+        // 不调用 resetTimer()，由父组件 switchToShortBreak() 切到短休息并设置 5 分钟
+        return
       }
       resetTimer()
     }
