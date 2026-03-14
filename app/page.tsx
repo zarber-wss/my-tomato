@@ -188,6 +188,27 @@ async function updateTodoCompleteInSupabase(id: string, completed: boolean) {
   }
 }
 
+async function deleteTaskFromSupabase(id: string) {
+  try {
+    const { error } = await supabase
+      .from("todos")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", STATIC_USER_ID)
+
+    if (error) {
+      console.error("Failed to delete task in Supabase:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      })
+    }
+  } catch (e) {
+    console.error("Failed to delete task in Supabase:", e)
+  }
+}
+
 async function savePomodoroSessionToSupabase(todoId?: string) {
   try {
     const { error } = await supabase.from("pomodoro_sessions").insert({
@@ -379,8 +400,10 @@ export default function PomodoroApp() {
 
   const handleConfirmDelete = useCallback(() => {
     if (deleteConfirm.taskId) {
-      setTasks((prev) => prev.filter((task) => task.id !== deleteConfirm.taskId))
-      setSelectedTask((prev) => (prev?.id === deleteConfirm.taskId ? undefined : prev))
+      const idToDelete = deleteConfirm.taskId
+      setTasks((prev) => prev.filter((task) => task.id !== idToDelete))
+      setSelectedTask((prev) => (prev?.id === idToDelete ? undefined : prev))
+      void deleteTaskFromSupabase(idToDelete)
       toast({
         description: "已删除",
         className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto min-w-0 bg-foreground/80 text-background text-sm font-medium px-6 py-2.5 rounded-full shadow-lg backdrop-blur-sm border-0",
@@ -486,7 +509,7 @@ export default function PomodoroApp() {
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl px-5 py-3 flex items-center justify-end border-b border-border/30">
           {activeTab === "timer" && (
             <div className="flex items-center gap-1 text-sm text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
-              <span className="font-medium">今日{completedPomodoros}/{totalPomodoros}</span>
+              <span className="font-medium">{isHydrated ? `今日${completedPomodoros}/${totalPomodoros}` : "今日 -/-"}</span>
               <span>🍅</span>
             </div>
           )}
@@ -506,23 +529,31 @@ export default function PomodoroApp() {
               />
             </section>
 
-            {/* Tasks Section */}
+            {/* Tasks Section - 仅在水合后渲染，避免服务端/客户端“今天”不一致导致 Hydration 报错 */}
             <section>
-              <TaskList
-                tasks={tasks}
-                onToggleComplete={handleToggleComplete}
-                onDelete={handleDeleteRequest}
-                onReorder={handleReorder}
-                onSelectTask={handleSelectTask}
-                onEditTask={handleEditTask}
-                selectedTaskId={selectedTask?.id}
-              />
+              {isHydrated ? (
+                <TaskList
+                  tasks={tasks}
+                  onToggleComplete={handleToggleComplete}
+                  onDelete={handleDeleteRequest}
+                  onReorder={handleReorder}
+                  onSelectTask={handleSelectTask}
+                  onEditTask={handleEditTask}
+                  selectedTaskId={selectedTask?.id}
+                />
+              ) : (
+                <div className="py-12 text-center text-muted-foreground text-sm">加载中...</div>
+              )}
             </section>
           </div>
           
-          {/* History Section - Always render but hide when not active */}
+          {/* History Section - 仅在水合后渲染 */}
           <div className={activeTab === "history" ? "block" : "hidden"}>
-            <HistorySection tasks={tasks} />
+            {isHydrated ? (
+              <HistorySection tasks={tasks} />
+            ) : (
+              <div className="py-12 text-center text-muted-foreground text-sm">加载中...</div>
+            )}
           </div>
         </main>
 
