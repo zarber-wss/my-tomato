@@ -8,25 +8,18 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: '番茄专注 - Pomodoro Timer',
+  title: '我の番茄',
   description: '极简番茄钟与待办管理应用',
-  generator: 'v0.app',
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
+      { url: '/tomato-icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/tomato-icon-192.png', sizes: '192x192', type: 'image/png' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/tomato-apple-icon.png',
+  },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    title: '我の番茄',
   },
 }
 

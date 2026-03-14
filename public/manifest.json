@@ -1,0 +1,21 @@
+{
+  "name": "我の番茄",
+  "short_name": "我の番茄",
+  "description": "极简番茄钟与待办管理应用",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f472b6",
+  "icons": [
+    {
+      "src": "/tomato-icon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/tomato-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
