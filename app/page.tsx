@@ -146,6 +146,7 @@ async function saveTaskToSupabase(task: Task) {
       description: task.notes ?? null,
       is_completed: task.completed,
       estimated_pomodoros: task.pomodoroCount,
+      completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
     })
 
     if (error) {
@@ -163,11 +164,13 @@ async function saveTaskToSupabase(task: Task) {
 
 async function updateTodoCompleteInSupabase(id: string, completed: boolean) {
   try {
+    const now = new Date().toISOString()
     const { error } = await supabase
       .from("todos")
       .update({
         is_completed: completed,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
+        completed_at: completed ? now : null,
       })
       .eq("id", id)
       .eq("user_id", STATIC_USER_ID)
@@ -212,7 +215,7 @@ async function loadTasksFromSupabase(): Promise<Task[] | null> {
   try {
     const { data, error } = await supabase
       .from("todos")
-      .select("id,title,description,is_completed,estimated_pomodoros,created_at,updated_at")
+      .select("id,title,description,is_completed,estimated_pomodoros,created_at,updated_at,completed_at")
       .eq("user_id", STATIC_USER_ID)
       .order("created_at", { ascending: true })
 
@@ -226,14 +229,19 @@ async function loadTasksFromSupabase(): Promise<Task[] | null> {
       return null
     }
 
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      name: row.title,
-      notes: row.description ?? undefined,
-      pomodoroCount: row.estimated_pomodoros ?? 1,
-      completedPomodoros: 0,
-      completed: !!row.is_completed,
-    }))
+    return (data ?? []).map((row) => {
+      const completed = !!row.is_completed
+      const completedAtRaw = row.completed_at ?? (completed ? row.updated_at : null)
+      return {
+        id: row.id,
+        name: row.title,
+        notes: row.description ?? undefined,
+        pomodoroCount: row.estimated_pomodoros ?? 1,
+        completedPomodoros: 0,
+        completed,
+        completedAt: completedAtRaw ? new Date(completedAtRaw) : undefined,
+      }
+    })
   } catch (e) {
     console.error("Failed to load tasks from Supabase:", e)
     return null
