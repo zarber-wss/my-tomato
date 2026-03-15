@@ -150,3 +150,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 顶部刘海/安全区沉浸：用固定条填满 safe-area-inset-top，与页面背景一致 */
+@supports (padding: env(safe-area-inset-top)) {
+  html {
+    background-color: #e8eef7;
+  }
+  html::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background-color: #e8eef7;
+    z-index: -1;
+    pointer-events: none;
+  }
+}
