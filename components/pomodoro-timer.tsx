@@ -77,8 +77,24 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
     const [hasStarted, setHasStarted] = useState(false)
     const [isOvertime, setIsOvertime] = useState(false)
     const [overtimeSeconds, setOvertimeSeconds] = useState(0)
+    const [showCompleteCelebration, setShowCompleteCelebration] = useState(false)
+    /** 庆祝动效阶段：先 from 再 to，用 transition 散开（避免 keyframes 里 var() 不插值） */
+    const [celebrationPhase, setCelebrationPhase] = useState<"from" | "to">("from")
     /** 结束时间戳（ms），用于退到后台后仍能正确倒计时 */
     const endTimeRef = useRef<number | null>(null)
+    /** 庆祝动效粒子：角度(deg)、距离(px)、延迟(ms)、emoji */
+    const celebrationParticlesRef = useRef<Array<{ angle: number; distance: number; delay: number; emoji: string }>>([])
+
+    useEffect(() => {
+      if (!showCompleteCelebration) {
+        setCelebrationPhase("from")
+        return
+      }
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setCelebrationPhase("to"))
+      })
+      return () => cancelAnimationFrame(id)
+    }, [showCompleteCelebration])
 
     const formatTime = (seconds: number) => {
       const mins = Math.floor(Math.abs(seconds) / 60)
@@ -144,9 +160,20 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       onTimerStop?.()
     }
 
+    const COMPLETE_EMOJI = ["🎉", "🍅", "⭐", "🎊", "🌟", "✨", "💪", "🔥", "👍", "💯"]
     const completePomodoroEarly = () => {
       if (mode === "pomodoro") {
-        onPomodoroComplete?.()
+        celebrationParticlesRef.current = Array.from({ length: 12 }, () => ({
+          angle: Math.random() * 360,
+          distance: 50 + Math.random() * 55,
+          delay: Math.floor(Math.random() * 120),
+          emoji: COMPLETE_EMOJI[Math.floor(Math.random() * COMPLETE_EMOJI.length)],
+        }))
+        setShowCompleteCelebration(true)
+        setTimeout(() => {
+          onPomodoroComplete?.()
+          setShowCompleteCelebration(false)
+        }, 1000)
         return
       }
       handleModeChange("pomodoro")
@@ -220,6 +247,29 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
     const displayTimeLeft = isRemote ? remoteTimeLeft : timeLeft
     const displayTask = isRemote ? remoteTaskName : currentTask
 
+    useEffect(() => {
+      const defaultTitle = "我の番茄"
+      const active = (hasStarted && isRunning) || !!isRemote
+      if (active) {
+        const timeStr = isOvertime
+          ? formatOvertimeDisplay(overtimeSeconds)
+          : formatTime(displayTimeLeft)
+        document.title = `${timeStr} - ${defaultTitle}`
+      } else {
+        document.title = defaultTitle
+      }
+      return () => {
+        document.title = "我の番茄"
+      }
+    }, [
+      hasStarted,
+      isRunning,
+      isRemote,
+      isOvertime,
+      overtimeSeconds,
+      displayTimeLeft,
+    ])
+
     return (
       <div className="bg-transparent rounded-[28px] px-4 py-6 min-h-[320px]">
         {/* Mode Tabs - 新拟态大圆角 */}
@@ -257,7 +307,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
               {formatTime(displayTimeLeft)}
             </span>
           ) : isOvertime ? (
-            <span className={cn("font-timer-digits text-8xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
+            <span className="font-timer-digits text-8xl font-bold tracking-[0.06em] text-stone-800">
               {formatOvertimeDisplay(overtimeSeconds)}
             </span>
           ) : (
@@ -268,7 +318,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         </button>
 
         {/* Control Buttons - Below timer；远程计时时显示「在本机操作」可接管 */}
-        <div className="flex items-center justify-center h-11">
+        <div className="flex items-center justify-center h-11 overflow-visible">
           {isRemote ? (
             <div className="flex flex-col items-center gap-2">
               {onAdoptToLocal && (
@@ -282,15 +332,46 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
               )}
             </div>
           ) : isOvertime ? (
-            <button
-              onClick={completePomodoroEarly}
-              className={cn(
-                "py-2.5 px-18 rounded-full text-base font-semibold text-white shadow-lg shadow-emerald-300/50 transition-all duration-300 ease-out active:scale-95",
-                currentModeConfig.bgColor
+            <div className="relative inline-block overflow-visible">
+              {showCompleteCelebration && (
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] flex items-center justify-center pointer-events-none z-10">
+                  {celebrationParticlesRef.current.map((p, i) => {
+                    const rad = (p.angle * Math.PI) / 180
+                    const tx = Math.cos(rad) * p.distance
+                    const ty = Math.sin(rad) * p.distance
+                    const from = "translate(-50%, -50%) translate(0, 0) scale(0.3)"
+                    const to = `translate(-50%, -50%) translate(${tx}px, ${ty}px) scale(0.9)`
+                    return (
+                      <span
+                        key={i}
+                        className="absolute left-1/2 top-1/2 text-2xl pointer-events-none"
+                        style={{
+                          transform: celebrationPhase === "from" ? from : to,
+                          opacity: celebrationPhase === "from" ? 1 : 0,
+                          transition: "transform 0.6s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.6s ease-out",
+                          transitionDelay: `${p.delay}ms`,
+                        }}
+                      >
+                        {p.emoji}
+                      </span>
+                    )
+                  })}
+                </div>
               )}
-            >
-              完成
-            </button>
+              <button
+                onClick={completePomodoroEarly}
+                className={cn(
+                  "relative py-2.5 px-18 rounded-full text-base font-semibold text-white shadow-lg transition-all duration-300 ease-out active:scale-95",
+                  mode === "pomodoro"
+                    ? "bg-violet-600 shadow-violet-400/50"
+                    : mode === "shortBreak"
+                      ? "bg-sky-500 shadow-sky-400/50"
+                      : "bg-teal-500 shadow-teal-400/50"
+                )}
+              >
+                完成
+              </button>
+            </div>
           ) : (
             <div className={cn(
               "flex items-center justify-center transition-all duration-300 ease-out",
@@ -321,18 +402,45 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
                 {!hasStarted ? "开始" : isRunning ? "暂停" : "继续"}
               </button>
 
-              <button
-                onClick={completePomodoroEarly}
-                className={cn(
-                  "w-9 h-9 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center neumorphic-convex transition-all duration-300 ease-out active:scale-95 hover:bg-stone-200/80",
-                  hasStarted 
-                    ? "opacity-100 scale-100" 
-                    : "opacity-0 scale-0 w-0 pointer-events-none"
+              <div className="relative inline-block overflow-visible">
+                {showCompleteCelebration && (
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] flex items-center justify-center pointer-events-none z-10">
+                    {celebrationParticlesRef.current.map((p, i) => {
+                      const rad = (p.angle * Math.PI) / 180
+                      const tx = Math.cos(rad) * p.distance
+                      const ty = Math.sin(rad) * p.distance
+                      const from = "translate(-50%, -50%) translate(0, 0) scale(0.3)"
+                      const to = `translate(-50%, -50%) translate(${tx}px, ${ty}px) scale(0.9)`
+                      return (
+                        <span
+                          key={i}
+                          className="absolute left-1/2 top-1/2 text-2xl pointer-events-none"
+                          style={{
+                            transform: celebrationPhase === "from" ? from : to,
+                            opacity: celebrationPhase === "from" ? 1 : 0,
+                            transition: "transform 0.6s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.6s ease-out",
+                            transitionDelay: `${p.delay}ms`,
+                          }}
+                        >
+                          {p.emoji}
+                        </span>
+                      )
+                    })}
+                  </div>
                 )}
-                title="完成本次番茄"
-              >
-                <Check size={16} className="text-stone-500" />
-              </button>
+                <button
+                  onClick={completePomodoroEarly}
+                  className={cn(
+                    "relative w-9 h-9 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center neumorphic-convex transition-all duration-300 ease-out active:scale-95 hover:bg-stone-200/80",
+                    hasStarted 
+                      ? "opacity-100 scale-100" 
+                      : "opacity-0 scale-0 w-0 pointer-events-none"
+                  )}
+                  title="完成本次番茄"
+                >
+                  <Check size={16} className="text-stone-500" />
+                </button>
+              </div>
             </div>
           )}
         </div>

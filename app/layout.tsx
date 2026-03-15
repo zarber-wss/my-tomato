@@ -31,13 +31,13 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
   },
-  themeColor: '#e8eef7',
-}
+  }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: '#e8eef7',
 }
 
 export default function RootLayout({
