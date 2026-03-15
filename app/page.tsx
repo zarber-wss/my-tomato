@@ -477,7 +477,7 @@ export default function PomodoroApp() {
     }
   }, [tasks, isHydrated])
 
-  // 切回本页面时从云端拉取最新任务，多端同步
+  // 切回本页面时从云端拉取最新任务与计时状态，多端同步（无需刷新）
   useEffect(() => {
     if (!isHydrated) return
     const onVisible = () => {
@@ -492,6 +492,7 @@ export default function PomodoroApp() {
           })
         }
       })
+      loadTimerStateFromSupabase().then((state) => setRemoteTimer(state))
     }
     document.addEventListener("visibilitychange", onVisible)
     return () => document.removeEventListener("visibilitychange", onVisible)
@@ -706,6 +707,15 @@ export default function PomodoroApp() {
     void updateTaskCreatedAtInSupabase(id, now)
   }, [])
 
+  const handleAdoptToLocal = useCallback(() => {
+    if (!remoteTimer) return
+    const { endAt, mode, taskId } = remoteTimer
+    clearTimerStateInSupabase()
+    setRemoteTimer(null)
+    timerRef.current?.adoptRemote(endAt, mode)
+    saveTimerStateToSupabase(taskId, endAt, mode)
+  }, [remoteTimer])
+
   const handlePomodoroComplete = useCallback(() => {
     const taskId = selectedTask?.id
     if (taskId) {
@@ -772,6 +782,7 @@ export default function PomodoroApp() {
                   saveTimerStateToSupabase(selectedTask?.id ?? null, endAt, mode)
                 }
                 onTimerStop={() => clearTimerStateInSupabase()}
+                onAdoptToLocal={handleAdoptToLocal}
               />
             </section>
 

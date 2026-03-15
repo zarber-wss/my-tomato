@@ -20,10 +20,14 @@ interface PomodoroTimerProps {
   /** 本机开始/暂停时同步到云端 */
   onTimerStart?: (endAt: number, mode: TimerMode) => void
   onTimerStop?: () => void
+  /** 远程模式下点击「在本机操作」时由父组件接管（清除远程 + 调用 adoptRemote + 写回云端） */
+  onAdoptToLocal?: () => void
 }
 
 export interface PomodoroTimerRef {
   switchToShortBreak: () => void
+  /** 将远程计时接管为本机计时（用于本机重新打开后恢复操作） */
+  adoptRemote: (endAt: number, mode: TimerMode) => void
 }
 
 const TIMER_MODES = {
@@ -60,6 +64,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       onRemoteComplete,
       onTimerStart,
       onTimerStop,
+      onAdoptToLocal,
     },
     ref
   ) {
@@ -90,12 +95,23 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       onModeChange?.(newMode)
     }, [onModeChange, onTimerStop])
 
-    // Expose method to parent
+    const adoptRemote = useCallback((endAt: number, newMode: TimerMode) => {
+      const remaining = Math.max(0, Math.ceil((endAt - Date.now()) / 1000))
+      setMode(newMode)
+      setTimeLeft(remaining)
+      setIsRunning(true)
+      setHasStarted(true)
+      setIsOvertime(false)
+      setOvertimeSeconds(0)
+      endTimeRef.current = endAt
+    }, [])
+
     useImperativeHandle(ref, () => ({
       switchToShortBreak: () => {
         handleModeChange("shortBreak")
-      }
-    }), [handleModeChange])
+      },
+      adoptRemote,
+    }), [handleModeChange, adoptRemote])
 
     const toggleTimer = () => {
       if (!isRunning && !hasStarted) {
@@ -245,10 +261,21 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
           )}
         </div>
 
-        {/* Control Buttons - Below timer；远程计时时不显示操作按钮 */}
+        {/* Control Buttons - Below timer；远程计时时显示「在本机操作」可接管 */}
         <div className="flex items-center justify-center h-11">
           {isRemote ? (
-            <div className="text-sm text-muted-foreground">同步自其他设备</div>
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-sm text-muted-foreground">同步自其他设备</span>
+              {onAdoptToLocal && (
+                <button
+                  type="button"
+                  onClick={onAdoptToLocal}
+                  className="py-2.5 px-6 rounded-xl text-sm font-medium bg-primary text-primary-foreground shadow-sm active:scale-95"
+                >
+                  在本机操作
+                </button>
+              )}
+            </div>
           ) : isOvertime ? (
             // Overtime mode: only show centered "Complete" button
             <button
