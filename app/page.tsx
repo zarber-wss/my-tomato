@@ -751,7 +751,9 @@ export default function PomodoroApp() {
     return completedDate.getTime() === today.getTime()
   })
 
-  const totalPomodoros = activeTasks.reduce((sum, t) => sum + t.pomodoroCount, 0)
+  const totalPomodoros =
+    activeTasks.reduce((sum, t) => sum + t.pomodoroCount, 0) +
+    todayCompletedTasks.reduce((sum, t) => sum + t.pomodoroCount, 0)
   const completedPomodoros = activeTasks.reduce((sum, t) => sum + t.completedPomodoros, 0) + 
                             todayCompletedTasks.reduce((sum, t) => sum + t.completedPomodoros, 0)
 
@@ -783,9 +785,21 @@ export default function PomodoroApp() {
                 }
                 onTimerStop={() => clearTimerStateInSupabase()}
                 onAdoptToLocal={handleAdoptToLocal}
-                onRequestSync={() =>
-                  loadTimerStateFromSupabase().then((state) => setRemoteTimer(state))
-                }
+                onRequestSync={async () => {
+                  const [timerState, remoteTasks] = await Promise.all([
+                    loadTimerStateFromSupabase(),
+                    loadTasksFromSupabase(),
+                  ])
+                  if (remoteTasks) {
+                    setTasks(remoteTasks)
+                    setSelectedTask((prev) => {
+                      const stillExists = prev && remoteTasks.some((t) => t.id === prev.id)
+                      if (stillExists) return remoteTasks.find((t) => t.id === prev!.id) ?? prev
+                      return remoteTasks.find((t) => !t.completed && t.createdAt != null)
+                    })
+                  }
+                  setRemoteTimer(timerState)
+                }}
               />
             </section>
 
