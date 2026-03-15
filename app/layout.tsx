@@ -37,7 +37,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover', // 视口延伸至安全区，实现沉浸式状态栏
-  themeColor: '#e8eef7',
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({
@@ -46,12 +46,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-[#e8eef7]">
+    <html lang="en" className="bg-white">
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={`${nunito.className} ${rubik.variable} antialiased bg-[#e8eef7] min-h-screen min-h-dvh`}>
+      <body className={`${nunito.className} ${rubik.variable} antialiased bg-white min-h-screen min-h-dvh`}>
         {children}
         <Toaster />
         <Analytics />

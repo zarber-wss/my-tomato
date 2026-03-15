@@ -154,7 +154,7 @@
 /* 顶部刘海/安全区沉浸：用固定条填满 safe-area-inset-top，与页面背景一致 */
 @supports (padding: env(safe-area-inset-top)) {
   html {
-    background-color: #e8eef7;
+    background-color: #fff;
   }
   html::before {
     content: '';
@@ -163,7 +163,7 @@
     left: 0;
     right: 0;
     height: env(safe-area-inset-top);
-    background-color: #e8eef7;
+    background-color: #fff;
     z-index: -1;
     pointer-events: none;
   }

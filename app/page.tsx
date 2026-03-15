@@ -761,12 +761,15 @@ export default function PomodoroApp() {
 
   return (
     <div className="min-h-[100dvh] relative pt-[env(safe-area-inset-top,0px)]">
-      {/* 全屏背景图 - 铺满视口，手机无顶部留白 */}
+      {/* 全屏背景 - radial-gradient 蓝粉光晕，铺满视口含刘海区 */}
       <div
-        className="fixed left-0 right-0 bottom-0 z-0 bg-cover bg-center bg-no-repeat"
+        className="fixed left-0 right-0 bottom-0 z-0"
         style={{
-          backgroundColor: "#e8eef7",
-          backgroundImage: "url(/bg-light.png)",
+          backgroundColor: "white",
+          backgroundImage: [
+            "radial-gradient(circle at 85% 15%, rgba(59, 130, 246, 0.15) 0%, transparent 45%)",
+            "radial-gradient(circle at 10% 55%, rgba(236, 72, 153, 0.15) 0%, transparent 45%)",
+          ].join(", "),
           top: "calc(-1 * env(safe-area-inset-top, 0px))",
           height: "calc(100dvh + env(safe-area-inset-top, 0px))",
           minHeight: "calc(100dvh + env(safe-area-inset-top, 0px))",
