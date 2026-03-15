@@ -783,6 +783,9 @@ export default function PomodoroApp() {
                 }
                 onTimerStop={() => clearTimerStateInSupabase()}
                 onAdoptToLocal={handleAdoptToLocal}
+                onRequestSync={() =>
+                  loadTimerStateFromSupabase().then((state) => setRemoteTimer(state))
+                }
               />
             </section>
 

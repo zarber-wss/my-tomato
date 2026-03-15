@@ -29,6 +29,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: '我の番茄',
   },
+  themeColor: '#f5f6f8',
 }
 
 export default function RootLayout({
@@ -37,8 +38,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${nunito.className} ${rubik.variable} antialiased`}>
+    <html lang="en" className="bg-background">
+      <body className={`${nunito.className} ${rubik.variable} antialiased bg-background min-h-screen min-h-dvh`}>
         {children}
         <Toaster />
         <Analytics />

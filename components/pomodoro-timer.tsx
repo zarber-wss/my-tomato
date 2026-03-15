@@ -22,6 +22,8 @@ interface PomodoroTimerProps {
   onTimerStop?: () => void
   /** 远程模式下点击「在本机操作」时由父组件接管（清除远程 + 调用 adoptRemote + 写回云端） */
   onAdoptToLocal?: () => void
+  /** 点击倒计时数字时请求重新拉取同步计时数据 */
+  onRequestSync?: () => void
 }
 
 export interface PomodoroTimerRef {
@@ -65,6 +67,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       onTimerStart,
       onTimerStop,
       onAdoptToLocal,
+      onRequestSync,
     },
     ref
   ) {
@@ -82,6 +85,9 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       const secs = Math.abs(seconds) % 60
       return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
     }
+    /** 正计时显示：25:00 -> 25:01 -> 25:02 ... 26:00 ... */
+    const formatOvertimeDisplay = (overtimeSeconds: number) =>
+      formatTime(TIMER_MODES.pomodoro.time + overtimeSeconds)
 
     const handleModeChange = useCallback((newMode: TimerMode) => {
       setMode(newMode)
@@ -236,8 +242,12 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
           </div>
         </div>
 
-        {/* Large Time Display */}
-        <div className="flex flex-col items-center my-8">
+        {/* Large Time Display - 点击可重新拉取同步计时 */}
+        <button
+          type="button"
+          onClick={onRequestSync}
+          className="flex flex-col items-center my-8 w-full cursor-pointer touch-manipulation active:opacity-90"
+        >
           {isRemote ? (
             <>
               <span className="text-xs text-muted-foreground mb-1">其他设备计时中</span>
@@ -246,31 +256,25 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
               </span>
             </>
           ) : isOvertime ? (
-            <div className="flex flex-col items-center">
-              <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
-                {formatTime(0)}
-              </span>
-              <span className={cn("font-timer-digits text-lg font-medium mt-1 tracking-[0.04em]", currentModeConfig.textColor)}>
-                +{formatTime(overtimeSeconds)}
-              </span>
-            </div>
+            <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
+              {formatOvertimeDisplay(overtimeSeconds)}
+            </span>
           ) : (
             <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
               {formatTime(displayTimeLeft)}
             </span>
           )}
-        </div>
+        </button>
 
         {/* Control Buttons - Below timer；远程计时时显示「在本机操作」可接管 */}
         <div className="flex items-center justify-center h-11">
           {isRemote ? (
             <div className="flex flex-col items-center gap-2">
-              <span className="text-sm text-muted-foreground">同步自其他设备</span>
               {onAdoptToLocal && (
                 <button
                   type="button"
                   onClick={onAdoptToLocal}
-                  className="py-2.5 px-6 rounded-xl text-sm font-medium bg-primary text-primary-foreground shadow-sm active:scale-95"
+                  className="py-2.5 px-16 rounded-xl text-base font-semibold bg-primary text-primary-foreground shadow-sm active:scale-95"
                 >
                   在本机操作
                 </button>
@@ -292,19 +296,21 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
               "flex items-center justify-center transition-all duration-300 ease-out",
               hasStarted ? "gap-4" : "gap-0"
             )}>
-              {/* Reset Button - Only visible after started */}
-              <button
-                onClick={resetTimer}
-                className={cn(
-                  "w-9 h-9 rounded-full bg-secondary text-muted-foreground flex items-center justify-center transition-all duration-300 ease-out active:scale-95 hover:bg-secondary/80",
-                  hasStarted 
-                    ? "opacity-100 scale-100" 
-                    : "opacity-0 scale-0 w-0 pointer-events-none"
-                )}
-                title="重置"
-              >
-                <RotateCcw size={16} />
-              </button>
+              {/* Reset Button - 开始后显示，正计时（overtime）时不显示 */}
+              {!isOvertime && (
+                <button
+                  onClick={resetTimer}
+                  className={cn(
+                    "w-9 h-9 rounded-full bg-secondary text-muted-foreground flex items-center justify-center transition-all duration-300 ease-out active:scale-95 hover:bg-secondary/80",
+                    hasStarted 
+                      ? "opacity-100 scale-100" 
+                      : "opacity-0 scale-0 w-0 pointer-events-none"
+                  )}
+                  title="重置"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              )}
 
               {/* Start/Pause Button */}
               <button
