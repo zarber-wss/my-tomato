@@ -32,6 +32,18 @@ export interface PomodoroTimerRef {
   adoptRemote: (endAt: number, mode: TimerMode) => void
 }
 
+/** 页面不可见时发送桌面通知（需先获得用户授权） */
+function notifyIfHidden(title: string, body: string) {
+  if (typeof window === "undefined" || !("Notification" in window)) return
+  if (document.visibilityState === "visible") return
+  if (Notification.permission !== "granted") return
+  try {
+    new Notification(title, { body })
+  } catch {
+    // ignore
+  }
+}
+
 const TIMER_MODES = {
   pomodoro: { 
     time: 25 * 60, 
@@ -84,6 +96,7 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
     const endTimeRef = useRef<number | null>(null)
     /** 庆祝动效粒子：角度(deg)、距离(px)、延迟(ms)、emoji */
     const celebrationParticlesRef = useRef<Array<{ angle: number; distance: number; delay: number; emoji: string }>>([])
+    const hasRequestedNotificationRef = useRef(false)
 
     useEffect(() => {
       if (!showCompleteCelebration) {
@@ -140,6 +153,10 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         setHasStarted(true)
       }
       if (!isRunning) {
+        if (!hasRequestedNotificationRef.current && typeof window !== "undefined" && "Notification" in window) {
+          hasRequestedNotificationRef.current = true
+          Notification.requestPermission().catch(() => {})
+        }
         const endAt = Date.now() + timeLeft * 1000
         endTimeRef.current = endAt
         onTimerStart?.(endAt, mode)
@@ -207,11 +224,16 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
             if (remaining === 0) {
               endTimeRef.current = null
               if (mode === "pomodoro") {
-                // 专注 25 分钟结束 → 进入正计时，不调用 onComplete（等用户点「完成」再回调）
+                notifyIfHidden("嘿！完成了一个🍅！", "25 分钟已结束，已进入正计时，记得休息一下哦")
                 onTimerStop?.()
                 setIsOvertime(true)
                 setOvertimeSeconds(0)
               } else {
+                if (mode === "shortBreak") {
+                  notifyIfHidden("短休息结束", "可以开始下一轮专注了")
+                } else if (mode === "longBreak") {
+                  notifyIfHidden("长休息结束", "可以开始下一轮专注了")
+                }
                 onTimerStop?.()
                 setMode("pomodoro")
                 setTimeLeft(TIMER_MODES.pomodoro.time)
