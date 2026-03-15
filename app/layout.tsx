@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Nunito, Rubik } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
@@ -28,8 +28,16 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     title: '我の番茄',
+    capable: true,
+    statusBarStyle: 'black-translucent',
   },
-  themeColor: '#f5f6f8',
+  themeColor: '#e8eef7',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -38,8 +46,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background">
-      <body className={`${nunito.className} ${rubik.variable} antialiased bg-background min-h-screen min-h-dvh`}>
+    <html lang="en" className="bg-[#e8eef7]">
+      <body className={`${nunito.className} ${rubik.variable} antialiased bg-[#e8eef7] min-h-screen min-h-dvh`}>
         {children}
         <Toaster />
         <Analytics />

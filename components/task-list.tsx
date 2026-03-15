@@ -36,10 +36,10 @@ interface TaskListProps {
 }
 
 const CARD_COLORS = [
-  { bg: "bg-pink-50", border: "border-pink-300", shadow: "shadow-pink-200/50" },
-  { bg: "bg-blue-50", border: "border-blue-300", shadow: "shadow-blue-200/50" },
-  { bg: "bg-emerald-50", border: "border-emerald-300", shadow: "shadow-emerald-200/50" },
-  { bg: "bg-amber-50", border: "border-amber-300", shadow: "shadow-amber-200/50" },
+  { bg: "bg-white", border: "border-violet-200/60", shadow: "neumorphic-convex" },
+  { bg: "bg-white", border: "border-sky-200/60", shadow: "neumorphic-convex" },
+  { bg: "bg-white", border: "border-emerald-200/60", shadow: "neumorphic-convex" },
+  { bg: "bg-white", border: "border-amber-200/60", shadow: "neumorphic-convex" },
 ]
 
 export function TaskList({
@@ -243,35 +243,29 @@ export function TaskList({
         data-task-item
         onClick={() => !isCompleted && !isSortMode && onSelectTask(task)}
         className={cn(
-          "rounded-2xl px-4 py-3.5 transition-all duration-200 border-2",
+          "rounded-2xl pl-4 pr-2 py-3.5 transition-all duration-200 shadow-sm shadow-stone-200/50",
           isCompleted 
-            ? "bg-white border-border/30 shadow-sm" 
-            : cn(colorConfig.bg, "shadow-md", colorConfig.shadow),
-          !isCompleted && (!isSelected || isSortMode) && "border-transparent",
+            ? "bg-amber-50/90 border border-amber-200/60" 
+            : cn(colorConfig.bg, "border-2", isSelected && !isSortMode ? colorConfig.border : "border-stone-200/70"),
           !isCompleted && !isSortMode && "cursor-pointer",
-          isSelected && !isCompleted && !isSortMode && cn(
-            colorConfig.border,
-            "shadow-[inset_2px_2px_4px_rgba(255,255,255,0.8),inset_-2px_-2px_4px_rgba(0,0,0,0.08),4px_4px_8px_rgba(0,0,0,0.1)]"
-          ),
           isDragging && "opacity-0 min-h-[56px]",
           isSortMode && !isCompleted && "cursor-default",
           isNewTask && "animate-in slide-in-from-bottom-4 fade-in duration-300"
         )}
       >
-        <div className="flex items-center gap-3">
-          {/* Task Info */}
-          <div className="flex-1 min-w-0 pr-2 flex items-center">
+        <div className="flex items-center gap-1 min-h-[2.5rem]">
+          <div className="flex-1 min-w-0 pr-0.5 flex items-center">
             <div>
               <p className={cn(
                 "font-medium break-words leading-normal",
-                isCompleted ? "text-muted-foreground" : "text-foreground"
+                isCompleted ? "text-black" : "text-stone-800"
               )}>
                 {task.name}
               </p>
               {hasNotes && (
                 <p className={cn(
                   "text-sm mt-1 whitespace-pre-wrap break-words leading-normal",
-                  isCompleted ? "text-muted-foreground/60" : "text-foreground/60"
+                  isCompleted ? "text-stone-600" : "text-stone-500"
                 )}>
                   {task.notes}
                 </p>
@@ -279,47 +273,44 @@ export function TaskList({
             </div>
           </div>
 
-          {/* Pomodoro Count */}
-          <div className="flex items-center gap-1 text-sm text-foreground/60 flex-shrink-0">
+          <div className="flex items-center gap-1 text-sm text-stone-500 flex-shrink-0 w-[3.5rem] justify-end">
             <span className="font-medium">
               {task.completedPomodoros}/{task.pomodoroCount}
             </span>
             <span className="text-base">🍅</span>
           </div>
 
-          {/* Sort Mode: 仅把手可拖拽，卡片其余区域可正常滑动 */}
-          {isSortMode && !isCompleted && (
-            <div
-              className="flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing p-1 touch-none"
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDrag={handleDrag}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onTouchStart={(e) => {
-                e.preventDefault()
-                handleTouchStart(e, index)
-              }}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            >
-              <GripVertical size={20} className="text-foreground/40" />
-            </div>
-          )}
-
-          {/* 操作入口 - 点击打开浮层：完成任务 / 修改任务 / 删除任务 */}
-          {!isSortMode && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setActionsTaskId(task.id)
-              }}
-              className="p-2.5 -m-1 rounded-xl hover:bg-foreground/5 transition-colors flex-shrink-0"
-            >
-              <MoreVertical size={22} className="text-foreground/40" />
-            </button>
-          )}
+          <div className="w-10 flex-shrink-0 flex items-center justify-center">
+            {isSortMode && !isCompleted ? (
+              <div
+                className="flex items-center justify-center cursor-grab active:cursor-grabbing p-1 touch-none"
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDrag={handleDrag}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  handleTouchStart(e, index)
+                }}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <GripVertical size={20} className="text-stone-400" />
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActionsTaskId(task.id)
+                }}
+                className="p-2 rounded-xl hover:bg-stone-100/80 transition-colors min-h-[2.25rem] flex items-center justify-center"
+              >
+                <MoreVertical size={22} className="text-stone-400" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -359,24 +350,24 @@ export function TaskList({
         className="flex flex-col gap-3"
         onDragOver={handleDragOver}
       >
-      {/* Header: 今日待办 + n个任务 已完成x/y🍅 在左侧，排序在右侧（上下间距为原 1.5 倍） */}
+      {/* Header: 今日待办 - 新拟态柔和色 */}
       <div className="flex items-center justify-between my-1.5">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-foreground">今日待办</h2>
-          <span className="text-xs text-muted-foreground">
+          <h2 className="text-xl font-semibold text-stone-800">今日待办</h2>
+          <span className="text-xs text-stone-500">
             {totalTaskCountProp ?? totalTaskCount}个任务 已完成{completedPomodoros}/{totalPomodoros}🍅
           </span>
         </div>
         <button
           onClick={() => setIsSortMode(!isSortMode)}
           className={cn(
-            "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors",
+            "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
             isSortMode 
-              ? "bg-pink-100 text-pink-600" 
-              : "bg-secondary text-muted-foreground hover:text-foreground"
+              ? "bg-emerald-100 text-emerald-600" 
+              : "bg-stone-100 text-stone-500 hover:text-stone-600"
           )}
         >
-          <ArrowUpDown size={14} />
+          <ArrowUpDown size={14} className="text-stone-500" />
           {isSortMode ? "完成" : "排序"}
         </button>
       </div>
@@ -453,7 +444,7 @@ export function TaskList({
       {!isSortMode && futureTasks.length > 0 && (
         <>
           <div className="flex items-center gap-2 my-1.5 mt-4">
-            <h2 className="text-base font-semibold text-foreground">未来待办</h2>
+            <h2 className="text-xl font-semibold text-foreground">未来待办</h2>
             <span className="text-xs text-muted-foreground">{futureTasks.length}个任务</span>
           </div>
           <div className="flex flex-col gap-3">

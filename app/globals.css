@@ -85,6 +85,18 @@
   font-family: var(--font-rubik), sans-serif;
 }
 
+/* 新拟态阴影：凸起（双阴影） */
+.neumorphic-convex {
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.06), -2px -2px 6px rgba(255, 255, 255, 0.85);
+}
+.neumorphic-convex-lg {
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.08), -4px -4px 12px rgba(255, 255, 255, 0.9);
+}
+/* 新拟态阴影：凹陷（内阴影） */
+.neumorphic-concave {
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.06), inset -2px -2px 4px rgba(255, 255, 255, 0.8);
+}
+
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';

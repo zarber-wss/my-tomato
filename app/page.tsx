@@ -758,15 +758,26 @@ export default function PomodoroApp() {
                             todayCompletedTasks.reduce((sum, t) => sum + t.completedPomodoros, 0)
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile Container */}
-      <div className="max-w-md mx-auto min-h-screen flex flex-col">
+    <div className="min-h-[100dvh] relative pt-[env(safe-area-inset-top,0px)]">
+      {/* 全屏背景图 - 铺满视口，手机无顶部留白 */}
+      <div
+        className="fixed left-0 right-0 bottom-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundColor: "#e8eef7",
+          backgroundImage: "url(/bg-light.png)",
+          top: "calc(-1 * env(safe-area-inset-top, 0px))",
+          height: "calc(100dvh + env(safe-area-inset-top, 0px))",
+          minHeight: "calc(100dvh + env(safe-area-inset-top, 0px))",
+        }}
+      />
+      {/* Mobile Container - 内容在背景之上 */}
+      <div className="relative z-10 max-w-md mx-auto min-h-[100dvh] flex flex-col">
         {/* Main Content */}
         <main ref={mainRef} className="flex-1 px-5 py-4 pb-24 overflow-y-auto">
           {/* Timer Section - Always render but hide when not active to preserve state */}
           <div className={activeTab === "timer" ? "block" : "hidden"}>
             {/* Timer Section */}
-            <section className="mb-4">
+            <section className="mb-16">
               <PomodoroTimer
                 ref={timerRef}
                 currentTask={selectedTask?.name}
@@ -856,7 +867,7 @@ export default function PomodoroApp() {
               {/* Add Task Button - 宽度约 1/6（当前 2/3 的 1/4）、白底阴影拟物风、+ 粉色 */}
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="w-full h-full min-h-0 bg-white text-pink-500 rounded-xl font-medium flex items-center justify-center border border-gray-200/90 shadow-[0_4px_0_0_rgba(0,0,0,0.06),0_6px_12px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:shadow-[0_1px_0_0_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] active:translate-y-0.5 transition-all"
+                className="w-full h-full min-h-0 bg-white text-emerald-500 rounded-xl font-medium flex items-center justify-center border border-gray-200/90 shadow-[0_4px_0_0_rgba(0,0,0,0.06),0_6px_12px_rgba(0,0,0,0.08)] active:shadow-[0_1px_0_0_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.06)] active:translate-y-0.5 transition-all"
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>

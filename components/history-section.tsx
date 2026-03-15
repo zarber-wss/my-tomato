@@ -137,7 +137,7 @@ export function HistorySection({ tasks }: HistorySectionProps) {
   return (
     <div className="space-y-4">
       {/* Total Stats Card - Horizontal Layout */}
-      <div className="bg-card rounded-2xl p-4 shadow-sm flex items-center justify-between">
+      <div className="bg-card rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)] flex items-center justify-between">
         <p className="text-sm text-muted-foreground">累计专注</p>
         <div className="flex items-center gap-1.5">
           <span className="text-3xl font-semibold text-foreground">{totalPomodoros}</span>
@@ -146,7 +146,7 @@ export function HistorySection({ tasks }: HistorySectionProps) {
       </div>
 
       {/* Daily Chart for Month */}
-      <div className="bg-card rounded-2xl p-4 shadow-sm">
+      <div className="bg-card rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
         {/* Month Navigation */}
         <div className="flex items-center justify-between mb-4">
           <button 
@@ -200,19 +200,19 @@ export function HistorySection({ tasks }: HistorySectionProps) {
               <div
                 key={day}
                 className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors ${
-                  isToday ? "ring-2 ring-pink-300" : ""
+                  isToday ? "ring-2 ring-emerald-300" : ""
                 }`}
                 style={{
                   backgroundColor: count > 0 
-                    ? `rgba(244, 114, 182, ${0.2 + intensity * 0.6})` 
+                    ? `rgba(52, 211, 153, ${0.25 + intensity * 0.5})` 
                     : "rgba(0,0,0,0.03)"
                 }}
               >
-                <span className={`font-medium ${count > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                <span className={`font-medium ${count > 0 ? "text-emerald-800" : "text-muted-foreground"}`}>
                   {day}
                 </span>
                 {count > 0 && (
-                  <span className="text-[10px] text-foreground/70">{count}</span>
+                  <span className="text-[10px] text-emerald-700">{count}</span>
                 )}
               </div>
             )
@@ -222,7 +222,7 @@ export function HistorySection({ tasks }: HistorySectionProps) {
 
       {/* History List - Grouped by date in single card */}
       {groupedTasks.size === 0 ? (
-        <div className="text-center py-12 bg-card rounded-2xl shadow-sm">
+        <div className="text-center py-12 bg-card rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
           <div className="text-4xl mb-3">📋</div>
           <p className="text-muted-foreground text-sm">暂无历史记录</p>
           <p className="text-xs text-muted-foreground mt-1">完成的任务会在这里显示</p>
@@ -230,7 +230,7 @@ export function HistorySection({ tasks }: HistorySectionProps) {
       ) : (
         <div className="space-y-4">
           {Array.from(groupedTasks.entries()).map(([dateKey, { displayDate, tasks: dateTasks }]) => (
-            <div key={dateKey} className="bg-card rounded-2xl p-4 shadow-sm">
+            <div key={dateKey} className="bg-card rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
               {/* Date Header */}
               <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
                 {displayDate}

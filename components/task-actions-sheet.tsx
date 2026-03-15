@@ -81,7 +81,7 @@ export function TaskActionsSheet({
           {isFutureTask && onAddToToday && (
             <button
               onClick={handleAddToToday}
-              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium bg-primary text-primary-foreground transition-colors hover:opacity-90 active:scale-[0.98]"
+              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium bg-emerald-400 text-white transition-colors hover:opacity-90 active:scale-[0.98]"
             >
               添加到今日待办
             </button>
@@ -97,7 +97,7 @@ export function TaskActionsSheet({
           {!isFutureTask && !task.completed && (
             <button
               onClick={handleComplete}
-              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium bg-primary text-primary-foreground transition-colors hover:opacity-90 active:scale-[0.98]"
+              className="w-full flex items-center justify-center px-4 py-4 rounded-xl font-medium bg-emerald-400 text-white transition-colors hover:opacity-90 active:scale-[0.98]"
             >
               完成任务
             </button>

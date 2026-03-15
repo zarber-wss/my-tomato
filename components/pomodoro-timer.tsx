@@ -36,20 +36,20 @@ const TIMER_MODES = {
   pomodoro: { 
     time: 25 * 60, 
     label: "专注", 
-    bgColor: "bg-pink-400",
-    textColor: "text-pink-400"
+    bgColor: "bg-violet-300/90",
+    textColor: "text-violet-600"
   },
   shortBreak: { 
     time: 5 * 60, 
     label: "短休息", 
-    bgColor: "bg-blue-400",
-    textColor: "text-blue-400"
+    bgColor: "bg-sky-300/90",
+    textColor: "text-sky-600"
   },
   longBreak: { 
     time: 15 * 60, 
     label: "长休息", 
-    bgColor: "bg-teal-400",
-    textColor: "text-teal-400"
+    bgColor: "bg-teal-300/90",
+    textColor: "text-teal-600"
   },
 }
 
@@ -179,12 +179,13 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
             setTimeLeft(remaining)
             if (remaining === 0) {
               endTimeRef.current = null
-              onTimerStop?.()
               if (mode === "pomodoro") {
+                // 专注 25 分钟结束 → 进入正计时，不调用 onComplete（等用户点「完成」再回调）
+                onTimerStop?.()
                 setIsOvertime(true)
                 setOvertimeSeconds(0)
-                onComplete?.()
               } else {
+                onTimerStop?.()
                 setMode("pomodoro")
                 setTimeLeft(TIMER_MODES.pomodoro.time)
                 setIsRunning(false)
@@ -220,19 +221,19 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
     const displayTask = isRemote ? remoteTaskName : currentTask
 
     return (
-      <div className="bg-card rounded-3xl px-4 py-6 shadow-sm min-h-[320px]">
-        {/* Mode Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-secondary rounded-xl p-1">
+      <div className="bg-transparent rounded-[28px] px-4 py-6 min-h-[320px]">
+        {/* Mode Tabs - 新拟态大圆角 */}
+        <div className="flex justify-center mt-1 mb-0">
+          <div className="inline-flex bg-stone-100 rounded-full p-1.5 neumorphic-concave">
             {(Object.keys(TIMER_MODES) as TimerMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => !isRemote && handleModeChange(m)}
                 className={cn(
-                  "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300",
+                  "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300",
                   displayMode === m
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-white text-stone-700 neumorphic-convex"
+                    : "text-stone-500 hover:text-stone-600",
                   isRemote && "pointer-events-none"
                 )}
               >
@@ -246,21 +247,21 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         <button
           type="button"
           onClick={onRequestSync}
-          className="flex flex-col items-center my-8 w-full cursor-pointer touch-manipulation active:opacity-90"
+          className="flex flex-col items-center mt-6 mb-10 w-full cursor-pointer touch-manipulation active:opacity-90"
         >
+          <span className="min-h-[1.25rem] text-xs text-stone-500 mb-1 block text-center">
+            {isRemote ? "其他设备计时中" : "\u00A0"}
+          </span>
           {isRemote ? (
-            <>
-              <span className="text-xs text-muted-foreground mb-1">其他设备计时中</span>
-              <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
-                {formatTime(displayTimeLeft)}
-              </span>
-            </>
+            <span className="font-timer-digits text-8xl font-bold tracking-[0.06em] text-stone-800">
+              {formatTime(displayTimeLeft)}
+            </span>
           ) : isOvertime ? (
-            <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
+            <span className={cn("font-timer-digits text-8xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
               {formatOvertimeDisplay(overtimeSeconds)}
             </span>
           ) : (
-            <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
+            <span className="font-timer-digits text-8xl font-bold tracking-[0.06em] text-stone-800">
               {formatTime(displayTimeLeft)}
             </span>
           )}
@@ -274,18 +275,17 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
                 <button
                   type="button"
                   onClick={onAdoptToLocal}
-                  className="py-2.5 px-16 rounded-xl text-base font-semibold bg-primary text-primary-foreground shadow-sm active:scale-95"
+                  className="py-2.5 px-18 rounded-full text-base font-semibold bg-emerald-400 text-white shadow-lg shadow-emerald-300/50 active:scale-95 transition-all"
                 >
                   在本机操作
                 </button>
               )}
             </div>
           ) : isOvertime ? (
-            // Overtime mode: only show centered "Complete" button
             <button
               onClick={completePomodoroEarly}
               className={cn(
-                "py-2.5 px-16 rounded-xl text-base font-semibold shadow-sm transition-all duration-300 ease-out active:scale-95 text-white",
+                "py-2.5 px-18 rounded-full text-base font-semibold text-white shadow-lg shadow-emerald-300/50 transition-all duration-300 ease-out active:scale-95",
                 currentModeConfig.bgColor
               )}
             >
@@ -296,56 +296,55 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
               "flex items-center justify-center transition-all duration-300 ease-out",
               hasStarted ? "gap-4" : "gap-0"
             )}>
-              {/* Reset Button - 开始后显示，正计时（overtime）时不显示 */}
               {!isOvertime && (
                 <button
                   onClick={resetTimer}
                   className={cn(
-                    "w-9 h-9 rounded-full bg-secondary text-muted-foreground flex items-center justify-center transition-all duration-300 ease-out active:scale-95 hover:bg-secondary/80",
+                    "w-9 h-9 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center neumorphic-convex transition-all duration-300 ease-out active:scale-95 hover:bg-stone-200/80",
                     hasStarted 
                       ? "opacity-100 scale-100" 
                       : "opacity-0 scale-0 w-0 pointer-events-none"
                   )}
                   title="重置"
                 >
-                  <RotateCcw size={16} />
+                  <RotateCcw size={16} className="text-stone-500" />
                 </button>
               )}
 
-              {/* Start/Pause Button */}
               <button
                 onClick={toggleTimer}
                 className={cn(
-                  "py-2.5 rounded-xl text-base font-semibold shadow-sm transition-all duration-300 ease-out active:scale-95 text-white",
-                  currentModeConfig.bgColor,
-                  hasStarted ? "px-16" : "px-16"
+                  "py-2.5 px-18 rounded-full text-base font-semibold text-white shadow-lg shadow-emerald-300/50 transition-all duration-300 ease-out active:scale-95",
+                  "bg-emerald-400"
                 )}
               >
                 {!hasStarted ? "开始" : isRunning ? "暂停" : "继续"}
               </button>
 
-              {/* Complete Pomodoro Button - Only visible after started */}
               <button
                 onClick={completePomodoroEarly}
                 className={cn(
-                  "w-9 h-9 rounded-full bg-secondary text-muted-foreground flex items-center justify-center transition-all duration-300 ease-out active:scale-95 hover:bg-secondary/80",
+                  "w-9 h-9 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center neumorphic-convex transition-all duration-300 ease-out active:scale-95 hover:bg-stone-200/80",
                   hasStarted 
                     ? "opacity-100 scale-100" 
                     : "opacity-0 scale-0 w-0 pointer-events-none"
                 )}
                 title="完成本次番茄"
               >
-                <Check size={16} />
+                <Check size={16} className="text-stone-500" />
               </button>
             </div>
           )}
         </div>
 
-        {/* Current Task - Below buttons */}
+        {/* Current Task - Below buttons，柔和灰 + 小绿点 */}
         {(displayTask || isRemote) && (
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">当前任务</p>
-            <p className="text-base font-medium text-foreground mt-1">{displayTask || "—"}</p>
+          <div className="mt-10 text-center">
+            <p className="text-sm text-stone-500 flex items-center justify-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              当前任务
+            </p>
+            <p className="text-base font-medium text-stone-800 mt-1">{displayTask || "—"}</p>
           </div>
         )}
       </div>

@@ -53,7 +53,7 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-4 rounded-2xl font-semibold text-lg bg-primary text-primary-foreground shadow-lg transition-all active:scale-98"
+            className="flex-1 py-4 rounded-2xl font-semibold text-lg bg-emerald-400 text-white shadow-lg shadow-emerald-300/40 transition-all active:scale-98"
           >
             删除
           </button>
