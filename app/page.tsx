@@ -630,15 +630,17 @@ export default function PomodoroApp() {
 
   const handleAddTask = useCallback((name: string, pomodoroCount: number, notes?: string, isToday = true) => {
     if (editingTask) {
+      const updatedTask = { ...editingTask, name, pomodoroCount, notes }
       setTasks((prev) =>
         prev.map((task) =>
-          task.id === editingTask.id
-            ? { ...task, name, pomodoroCount, notes }
-            : task
+          task.id === editingTask.id ? updatedTask : task
         )
       )
+      if (selectedTask?.id === editingTask.id) {
+        setSelectedTask(updatedTask)
+      }
       setEditingTask(null)
-      void updateTaskInSupabase(tasks.find((t) => t.id === editingTask.id)!, (msg) =>
+      void updateTaskInSupabase(updatedTask, (msg) =>
         toast({
           description: `同步到云端失败：${msg}`,
           variant: "destructive",
