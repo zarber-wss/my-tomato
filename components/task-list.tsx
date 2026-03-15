@@ -72,17 +72,17 @@ export function TaskList({
   const dragImageRef = React.useRef<HTMLDivElement>(null)
   const actionsTask = tasks.find((t) => t.id === actionsTaskId) ?? null
 
-  // Detect new task added
+  // Detect new task added：仅当确实新增了 1 个任务时才播放入场动画，避免完成番茄/休息时误触发闪烁
   useEffect(() => {
-    const prevIds = new Set(prevTasksRef.current.map(t => t.id))
-    const newTask = tasks.find(t => !prevIds.has(t.id) && !t.completed)
+    const prev = prevTasksRef.current
+    const prevIds = new Set(prev.map(t => t.id))
+    const added = tasks.filter(t => !prevIds.has(t.id))
+    const newTask = added.length === 1 ? added[0] : null
     
-    if (newTask) {
+    if (newTask && !newTask.completed) {
       setNewTaskId(newTask.id)
-      // Clear animation after it completes
-      const timer = setTimeout(() => {
-        setNewTaskId(null)
-      }, 500)
+      const timer = setTimeout(() => setNewTaskId(null), 500)
+      prevTasksRef.current = tasks
       return () => clearTimeout(timer)
     }
     

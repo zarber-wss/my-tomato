@@ -161,6 +161,39 @@ async function saveTaskToSupabase(
   }
 }
 
+async function updateTaskInSupabase(
+  task: Task,
+  onError?: (message: string) => void
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("todos")
+      .update({
+        title: task.name,
+        description: task.notes ?? null,
+        is_completed: task.completed,
+        estimated_pomodoros: task.pomodoroCount,
+        completed_pomodoros: task.completedPomodoros ?? 0,
+        completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
+        created_at: task.createdAt ? task.createdAt.toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", task.id)
+      .eq("user_id", STATIC_USER_ID)
+
+    if (error) {
+      console.error("Failed to update task in Supabase:", error.message)
+      onError?.(error.message)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.error("Failed to update task in Supabase:", e)
+    onError?.(e instanceof Error ? e.message : "保存失败")
+    return false
+  }
+}
+
 async function updateTodoCompleteInSupabase(id: string, completed: boolean) {
   try {
     const now = new Date().toISOString()
@@ -277,6 +310,55 @@ async function updateTaskOrderInSupabase(orderedIds: string[]) {
   }
 }
 
+async function saveTimerStateToSupabase(taskId: string | null, endAt: number, mode: string) {
+  try {
+    await supabase.from("timer_state").upsert(
+      {
+        user_id: STATIC_USER_ID,
+        task_id: taskId,
+        end_at: new Date(endAt).toISOString(),
+        mode,
+      },
+      { onConflict: "user_id" }
+    )
+  } catch (e) {
+    console.error("Failed to save timer state to Supabase:", e)
+  }
+}
+
+async function clearTimerStateInSupabase() {
+  try {
+    await supabase.from("timer_state").delete().eq("user_id", STATIC_USER_ID)
+  } catch (e) {
+    console.error("Failed to clear timer state in Supabase:", e)
+  }
+}
+
+async function loadTimerStateFromSupabase(): Promise<{
+  endAt: number
+  mode: "pomodoro" | "shortBreak" | "longBreak"
+  taskId: string | null
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from("timer_state")
+      .select("end_at, mode, task_id")
+      .eq("user_id", STATIC_USER_ID)
+      .maybeSingle()
+    if (error || !data?.end_at) return null
+    const endAt = new Date(data.end_at).getTime()
+    if (endAt <= Date.now()) return null
+    return {
+      endAt,
+      mode: (data.mode as "pomodoro" | "shortBreak" | "longBreak") || "pomodoro",
+      taskId: data.task_id ?? null,
+    }
+  } catch (e) {
+    console.error("Failed to load timer state from Supabase:", e)
+    return null
+  }
+}
+
 async function loadTasksFromSupabase(): Promise<Task[] | null> {
   try {
     const { data, error } = await supabase
@@ -351,6 +433,11 @@ export default function PomodoroApp() {
     isOpen: false,
     taskId: null,
   })
+  const [remoteTimer, setRemoteTimer] = useState<{
+    endAt: number
+    mode: "pomodoro" | "shortBreak" | "longBreak"
+    taskId: string | null
+  } | null>(null)
   const timerRef = useRef<PomodoroTimerRef>(null)
   const mainRef = useRef<HTMLElement>(null)
 
@@ -369,6 +456,8 @@ export default function PomodoroApp() {
       if (firstActiveTask) {
         setSelectedTask(firstActiveTask)
       }
+      const timerState = await loadTimerStateFromSupabase()
+      if (!cancelled && timerState) setRemoteTimer(timerState)
       setIsHydrated(true)
     }
 
@@ -432,6 +521,29 @@ export default function PomodoroApp() {
               })
             }
           })
+        }
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [isHydrated])
+
+  // Supabase Realtime：监听 timer_state，多端同步番茄计时
+  useEffect(() => {
+    if (!isHydrated) return
+    const channel = supabase
+      .channel("timer-state-sync")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "timer_state",
+          filter: `user_id=eq.${STATIC_USER_ID}`,
+        },
+        () => {
+          loadTimerStateFromSupabase().then((state) => setRemoteTimer(state))
         }
       )
       .subscribe()
@@ -525,7 +637,7 @@ export default function PomodoroApp() {
         )
       )
       setEditingTask(null)
-      void saveTaskToSupabase(tasks.find((t) => t.id === editingTask.id)!, (msg) =>
+      void updateTaskInSupabase(tasks.find((t) => t.id === editingTask.id)!, (msg) =>
         toast({
           description: `同步到云端失败：${msg}`,
           variant: "destructive",
@@ -547,7 +659,7 @@ export default function PomodoroApp() {
       const completed = prev.filter((t) => t.completed)
       const future = prev.filter((t) => !t.completed && t.createdAt == null)
       if (isToday) return [...active, newTask, ...completed, ...future]
-      return [...active, ...completed, ...future, newTask]
+      return [...active, ...completed, newTask, ...future]
     })
     toast({
       description: "已创建",
@@ -599,7 +711,7 @@ export default function PomodoroApp() {
     if (taskId) {
       const task = tasksRef.current.find((t) => t.id === taskId)
       if (task) {
-        const newCount = Math.min(task.completedPomodoros + 1, task.pomodoroCount)
+        const newCount = task.completedPomodoros + 1
         setTasks((prev) =>
           prev.map((t) =>
             t.id === taskId ? { ...t, completedPomodoros: newCount } : t
@@ -608,9 +720,11 @@ export default function PomodoroApp() {
         void updateTodoPomodorosInSupabase(taskId, newCount)
         void savePomodoroSessionToSupabase(taskId)
       }
+      void clearTimerStateInSupabase()
       timerRef.current?.switchToShortBreak()
     } else {
       void savePomodoroSessionToSupabase(undefined)
+      void clearTimerStateInSupabase()
       timerRef.current?.switchToShortBreak()
     }
   }, [selectedTask?.id])
@@ -646,6 +760,18 @@ export default function PomodoroApp() {
                 currentTask={selectedTask?.name}
                 onComplete={handlePomodoroComplete}
                 onPomodoroComplete={handlePomodoroComplete}
+                remoteEndAt={remoteTimer?.endAt ?? null}
+                remoteMode={remoteTimer?.mode ?? null}
+                remoteTaskName={
+                  remoteTimer?.taskId
+                    ? tasks.find((t) => t.id === remoteTimer.taskId)?.name ?? null
+                    : null
+                }
+                onRemoteComplete={() => setRemoteTimer(null)}
+                onTimerStart={(endAt, mode) =>
+                  saveTimerStateToSupabase(selectedTask?.id ?? null, endAt, mode)
+                }
+                onTimerStop={() => clearTimerStateInSupabase()}
               />
             </section>
 

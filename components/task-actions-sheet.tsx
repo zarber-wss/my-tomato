@@ -61,8 +61,7 @@ export function TaskActionsSheet({
         onClick={onClose}
       />
       <div
-        className="relative w-full max-w-md bg-card rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col"
-        style={{ maxHeight: "50vh" }}
+        className="relative w-full max-w-md bg-card rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[85vh]"
       >
         {/* 顶部拖拽把手 - 标题与浮层顶部间距加倍：pb-4 */}
         <div className="flex justify-center pt-4 pb-4 flex-shrink-0">
@@ -77,8 +76,8 @@ export function TaskActionsSheet({
             </p>
           ) : null}
         </div>
-        {/* 操作按钮：未来任务展示 添加到今日待办、修改任务、删除；今日任务展示 完成任务、修改任务、调整到未来待办、删除 */}
-        <div className="p-6 pt-4 flex-1 overflow-y-auto space-y-[14px]">
+        {/* 操作按钮：未来任务展示 添加到今日待办、修改任务、删除；今日任务展示 完成任务、修改任务、调整到未来待办、删除；高度自适应，内容多时可滚动 */}
+        <div className="p-6 pt-4 flex-1 min-h-0 overflow-y-auto space-y-[14px]">
           {isFutureTask && onAddToToday && (
             <button
               onClick={handleAddToToday}

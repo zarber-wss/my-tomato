@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react"
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from "react"
 import { RotateCcw, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -11,6 +11,15 @@ interface PomodoroTimerProps {
   onComplete?: () => void
   onPomodoroComplete?: () => void
   onModeChange?: (mode: TimerMode) => void
+  /** 多端同步：其他设备的计时结束时间戳（ms），设置时显示该倒计时 */
+  remoteEndAt?: number | null
+  remoteMode?: TimerMode | null
+  remoteTaskName?: string | null
+  /** 远程倒计时结束时回调（用于清除远程状态） */
+  onRemoteComplete?: () => void
+  /** 本机开始/暂停时同步到云端 */
+  onTimerStart?: (endAt: number, mode: TimerMode) => void
+  onTimerStop?: () => void
 }
 
 export interface PomodoroTimerRef {
@@ -39,13 +48,29 @@ const TIMER_MODES = {
 }
 
 export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
-  function PomodoroTimer({ currentTask, onComplete, onPomodoroComplete, onModeChange }, ref) {
+  function PomodoroTimer(
+    {
+      currentTask,
+      onComplete,
+      onPomodoroComplete,
+      onModeChange,
+      remoteEndAt,
+      remoteMode,
+      remoteTaskName,
+      onRemoteComplete,
+      onTimerStart,
+      onTimerStop,
+    },
+    ref
+  ) {
     const [mode, setMode] = useState<TimerMode>("pomodoro")
     const [timeLeft, setTimeLeft] = useState(TIMER_MODES.pomodoro.time)
     const [isRunning, setIsRunning] = useState(false)
     const [hasStarted, setHasStarted] = useState(false)
     const [isOvertime, setIsOvertime] = useState(false)
     const [overtimeSeconds, setOvertimeSeconds] = useState(0)
+    /** 结束时间戳（ms），用于退到后台后仍能正确倒计时 */
+    const endTimeRef = useRef<number | null>(null)
 
     const formatTime = (seconds: number) => {
       const mins = Math.floor(Math.abs(seconds) / 60)
@@ -60,8 +85,10 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       setHasStarted(false)
       setIsOvertime(false)
       setOvertimeSeconds(0)
+      endTimeRef.current = null
+      onTimerStop?.()
       onModeChange?.(newMode)
-    }, [onModeChange])
+    }, [onModeChange, onTimerStop])
 
     // Expose method to parent
     useImperativeHandle(ref, () => ({
@@ -74,6 +101,14 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       if (!isRunning && !hasStarted) {
         setHasStarted(true)
       }
+      if (!isRunning) {
+        const endAt = Date.now() + timeLeft * 1000
+        endTimeRef.current = endAt
+        onTimerStart?.(endAt, mode)
+      } else {
+        endTimeRef.current = null
+        onTimerStop?.()
+      }
       setIsRunning(!isRunning)
     }
 
@@ -83,18 +118,33 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       setHasStarted(false)
       setIsOvertime(false)
       setOvertimeSeconds(0)
+      endTimeRef.current = null
+      onTimerStop?.()
     }
 
     const completePomodoroEarly = () => {
       if (mode === "pomodoro") {
         onPomodoroComplete?.()
-        // 不调用 resetTimer()，由父组件 switchToShortBreak() 切到短休息并设置 5 分钟
         return
       }
-      // 短休息/长休息 点击「完成」时切回专注模式，倒计时 25 分钟
       handleModeChange("pomodoro")
     }
 
+    const isRemote = remoteEndAt != null && remoteEndAt > Date.now()
+    const [remoteTimeLeft, setRemoteTimeLeft] = useState(0)
+    useEffect(() => {
+      if (remoteEndAt == null || remoteEndAt <= Date.now()) return
+      const update = () => {
+        const left = Math.max(0, Math.ceil((remoteEndAt! - Date.now()) / 1000))
+        setRemoteTimeLeft(left)
+        if (left === 0) onRemoteComplete?.()
+      }
+      update()
+      const interval = setInterval(update, 1000)
+      return () => clearInterval(interval)
+    }, [remoteEndAt, onRemoteComplete])
+
+    // 基于结束时间戳的倒计时，退到后台再进入时仍正确
     useEffect(() => {
       let interval: NodeJS.Timeout | null = null
 
@@ -102,20 +152,24 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         interval = setInterval(() => {
           if (isOvertime) {
             setOvertimeSeconds((prev) => prev + 1)
-          } else if (timeLeft > 0) {
-            setTimeLeft((prev) => prev - 1)
-          } else if (timeLeft === 0 && mode === "pomodoro" && !isOvertime) {
-            // Enter overtime mode for pomodoro
-            setIsOvertime(true)
-            setOvertimeSeconds(0)
-            onComplete?.()
-          } else if (timeLeft === 0 && mode !== "pomodoro") {
-            // 短/长休息结束后切回专注模式，显示 25 分钟
-            setMode("pomodoro")
-            setTimeLeft(TIMER_MODES.pomodoro.time)
-            setIsRunning(false)
-            setHasStarted(false)
-            onModeChange?.("pomodoro")
+          } else if (endTimeRef.current != null) {
+            const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
+            setTimeLeft(remaining)
+            if (remaining === 0) {
+              endTimeRef.current = null
+              onTimerStop?.()
+              if (mode === "pomodoro") {
+                setIsOvertime(true)
+                setOvertimeSeconds(0)
+                onComplete?.()
+              } else {
+                setMode("pomodoro")
+                setTimeLeft(TIMER_MODES.pomodoro.time)
+                setIsRunning(false)
+                setHasStarted(false)
+                onModeChange?.("pomodoro")
+              }
+            }
           }
         }, 1000)
       }
@@ -123,24 +177,41 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
       return () => {
         if (interval) clearInterval(interval)
       }
-    }, [isRunning, timeLeft, mode, isOvertime, onComplete, onModeChange])
+    }, [isRunning, mode, isOvertime, onComplete, onModeChange, onTimerStop])
 
-    const currentModeConfig = TIMER_MODES[mode]
+    // 从后台回到前台时，根据 endTimeRef 立即校正剩余时间
+    useEffect(() => {
+      const onVisible = () => {
+        if (document.visibilityState !== "visible" || !isRunning || isOvertime) return
+        if (endTimeRef.current != null) {
+          const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
+          setTimeLeft(remaining)
+        }
+      }
+      document.addEventListener("visibilitychange", onVisible)
+      return () => document.removeEventListener("visibilitychange", onVisible)
+    }, [isRunning, isOvertime])
+
+    const displayMode = isRemote ? (remoteMode ?? mode) : mode
+    const currentModeConfig = TIMER_MODES[displayMode]
+    const displayTimeLeft = isRemote ? remoteTimeLeft : timeLeft
+    const displayTask = isRemote ? remoteTaskName : currentTask
 
     return (
-      <div className="bg-card rounded-3xl px-4 py-6 shadow-sm">
-        {/* Mode Tabs - Horizontal layout at top */}
+      <div className="bg-card rounded-3xl px-4 py-6 shadow-sm min-h-[320px]">
+        {/* Mode Tabs */}
         <div className="flex justify-center mb-8">
           <div className="inline-flex bg-secondary rounded-xl p-1">
             {(Object.keys(TIMER_MODES) as TimerMode[]).map((m) => (
               <button
                 key={m}
-                onClick={() => handleModeChange(m)}
+                onClick={() => !isRemote && handleModeChange(m)}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300",
-                  mode === m
+                  displayMode === m
                     ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                  isRemote && "pointer-events-none"
                 )}
               >
                 {TIMER_MODES[m].label}
@@ -149,9 +220,16 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
           </div>
         </div>
 
-        {/* Large Time Display - Centered（倒计时数字字体在 globals 中设置） */}
+        {/* Large Time Display */}
         <div className="flex flex-col items-center my-8">
-          {isOvertime ? (
+          {isRemote ? (
+            <>
+              <span className="text-xs text-muted-foreground mb-1">其他设备计时中</span>
+              <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
+                {formatTime(displayTimeLeft)}
+              </span>
+            </>
+          ) : isOvertime ? (
             <div className="flex flex-col items-center">
               <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
                 {formatTime(0)}
@@ -162,14 +240,16 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
             </div>
           ) : (
             <span className={cn("font-timer-digits text-7xl font-bold tracking-[0.06em]", currentModeConfig.textColor)}>
-              {formatTime(timeLeft)}
+              {formatTime(displayTimeLeft)}
             </span>
           )}
         </div>
 
-        {/* Control Buttons - Below timer */}
+        {/* Control Buttons - Below timer；远程计时时不显示操作按钮 */}
         <div className="flex items-center justify-center h-11">
-          {isOvertime ? (
+          {isRemote ? (
+            <div className="text-sm text-muted-foreground">同步自其他设备</div>
+          ) : isOvertime ? (
             // Overtime mode: only show centered "Complete" button
             <button
               onClick={completePomodoroEarly}
@@ -229,10 +309,10 @@ export const PomodoroTimer = forwardRef<PomodoroTimerRef, PomodoroTimerProps>(
         </div>
 
         {/* Current Task - Below buttons */}
-        {currentTask && (
+        {(displayTask || isRemote) && (
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">当前任务</p>
-            <p className="text-base font-medium text-foreground mt-1">{currentTask}</p>
+            <p className="text-base font-medium text-foreground mt-1">{displayTask || "—"}</p>
           </div>
         )}
       </div>
