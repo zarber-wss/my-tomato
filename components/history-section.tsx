@@ -266,8 +266,10 @@ export function HistorySection({ tasks }: HistorySectionProps) {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground flex-shrink-0">
-                        <span>{task.completedPomodoros}</span>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground flex-shrink-0 tabular-nums">
+                        <span>
+                          {task.completedPomodoros}/{task.pomodoroCount}
+                        </span>
                         <span>🍅</span>
                       </div>
                     </div>

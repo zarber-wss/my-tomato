@@ -28,6 +28,10 @@ import {
   updateTodoPomodorosOnRemote,
   upsertTaskToRemote,
 } from "@/lib/task-remote"
+import {
+  applyPartialDayRolloverToTaskList,
+  msUntilNextLocalMidnight,
+} from "@/lib/day-rollover-split"
 
 type TabType = "timer" | "history"
 
@@ -246,6 +250,10 @@ export default function PomodoroApp() {
     tasksRef.current = tasks
   }, [tasks])
   const [selectedTask, setSelectedTask] = useState<Task | undefined>()
+  const selectedTaskRef = useRef<Task | undefined>(undefined)
+  useEffect(() => {
+    selectedTaskRef.current = selectedTask
+  }, [selectedTask])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>("timer")
@@ -321,6 +329,24 @@ export default function PomodoroApp() {
     })
   }, [bumpSyncFailure, resetSyncFailure, flushUnsyncedTasks])
 
+  /** 跨日：未完成且昨日已有番茄进度的今日任务 → 原任务收口进历史 + 新建剩余今日待办 */
+  const runPartialDayRollover = useCallback(() => {
+    const now = new Date()
+    const { next, changed, carryTaskIdByOriginalId } = applyPartialDayRolloverToTaskList(
+      tasksRef.current,
+      now,
+      generateUuid
+    )
+    if (!changed) return
+    setTasks(next)
+    const sel = selectedTaskRef.current
+    if (sel && carryTaskIdByOriginalId.has(sel.id)) {
+      const nid = carryTaskIdByOriginalId.get(sel.id)!
+      setSelectedTask(next.find((t) => t.id === nid))
+    }
+    queueMicrotask(() => void flushUnsyncedTasks(next))
+  }, [flushUnsyncedTasks])
+
   // 安全合并初始化：本地优先，按 updated_at 合并；再补推未同步任务
   useEffect(() => {
     let cancelled = false
@@ -337,6 +363,8 @@ export default function PomodoroApp() {
         resetSyncFailure()
         loaded = mergeTasksWithRemote(local, remote, pending)
       }
+      const rollover = applyPartialDayRolloverToTaskList(loaded, new Date(), generateUuid)
+      if (rollover.changed) loaded = rollover.next
       if (cancelled) return
       setTasks(loaded)
       const firstActiveTask = loaded.find((t) => !t.completed && t.createdAt != null)
@@ -356,6 +384,27 @@ export default function PomodoroApp() {
     // 仅挂载时做一次安全合并；依赖项刻意为空
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 本地自然日过 0 点：自动拆分「昨日有进度且未完成」的今日任务
+  useEffect(() => {
+    if (!isHydrated) return
+    let cancelled = false
+    const timeoutRef = { id: undefined as ReturnType<typeof setTimeout> | undefined }
+
+    const arm = () => {
+      if (timeoutRef.id !== undefined) clearTimeout(timeoutRef.id)
+      timeoutRef.id = window.setTimeout(() => {
+        if (cancelled) return
+        runPartialDayRollover()
+        arm()
+      }, msUntilNextLocalMidnight())
+    }
+    arm()
+    return () => {
+      cancelled = true
+      if (timeoutRef.id !== undefined) clearTimeout(timeoutRef.id)
+    }
+  }, [isHydrated, runPartialDayRollover])
 
   // Save tasks to localStorage whenever they change (only after hydration)
   useEffect(() => {
