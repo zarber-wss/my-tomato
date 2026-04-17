@@ -10,13 +10,30 @@ import { Celebration } from "@/components/celebration"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { toast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabaseClient"
+import { AlertCircle } from "lucide-react"
+import {
+  addPendingDeleteId,
+  hydrateStoredTask,
+  loadPendingDeleteIds,
+  mergeTasksWithRemote,
+  removePendingDeleteId,
+} from "@/lib/safe-sync"
+import {
+  STATIC_USER_ID,
+  deleteTaskFromRemote,
+  loadTasksFromRemote,
+  updateTaskOrderOnRemote,
+  updateTodoCompleteOnRemote,
+  updateTodoCreatedAtOnRemote,
+  updateTodoPomodorosOnRemote,
+  upsertTaskToRemote,
+} from "@/lib/task-remote"
 
 type TabType = "timer" | "history"
 
 const STORAGE_KEY = "pomodoro-tasks"
-const STATIC_USER_ID = "00000000-0000-0000-0000-000000000001"
 
-// Demo data with some history
+// Demo data with some history（演示数据视为已与云端对齐）
 const defaultTasks: Task[] = [
   {
     id: "1",
@@ -110,7 +127,11 @@ const defaultTasks: Task[] = [
     completed: true,
     completedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
   },
-]
+].map((t, i) => ({
+  ...t,
+  updatedAt: t.completedAt ?? t.createdAt ?? new Date(Date.now() - i * 60_000),
+  is_synced: true,
+}))
 
 function generateUuid() {
   // 优先用浏览器自带的 randomUUID
@@ -123,152 +144,6 @@ function generateUuid() {
     const v = c === "x" ? r : (r & 0x3) | 0x8
     return v.toString(16)
   })
-}
-
-async function saveTaskToSupabase(
-  task: Task,
-  onError?: (message: string) => void
-): Promise<boolean> {
-  try {
-    const { error } = await supabase.from("todos").insert({
-      id: task.id,
-      user_id: STATIC_USER_ID,
-      title: task.name,
-      description: task.notes ?? null,
-      is_completed: task.completed,
-      estimated_pomodoros: task.pomodoroCount,
-      completed_pomodoros: task.completedPomodoros ?? 0,
-      completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
-      created_at: task.createdAt ? task.createdAt.toISOString() : null,
-      sort_order: 999999,
-    })
-
-    if (error) {
-      console.error("Failed to save task to Supabase:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      })
-      onError?.(error.message)
-      return false
-    }
-    return true
-  } catch (e) {
-    console.error("Failed to save task to Supabase:", e)
-    onError?.(e instanceof Error ? e.message : "保存失败")
-    return false
-  }
-}
-
-async function updateTaskInSupabase(
-  task: Task,
-  onError?: (message: string) => void
-): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from("todos")
-      .update({
-        title: task.name,
-        description: task.notes ?? null,
-        is_completed: task.completed,
-        estimated_pomodoros: task.pomodoroCount,
-        completed_pomodoros: task.completedPomodoros ?? 0,
-        completed_at: task.completed && task.completedAt ? task.completedAt.toISOString() : null,
-        created_at: task.createdAt ? task.createdAt.toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", task.id)
-      .eq("user_id", STATIC_USER_ID)
-
-    if (error) {
-      console.error("Failed to update task in Supabase:", error.message)
-      onError?.(error.message)
-      return false
-    }
-    return true
-  } catch (e) {
-    console.error("Failed to update task in Supabase:", e)
-    onError?.(e instanceof Error ? e.message : "保存失败")
-    return false
-  }
-}
-
-async function updateTodoCompleteInSupabase(id: string, completed: boolean) {
-  try {
-    const now = new Date().toISOString()
-    const { error } = await supabase
-      .from("todos")
-      .update({
-        is_completed: completed,
-        updated_at: now,
-        completed_at: completed ? now : null,
-      })
-      .eq("id", id)
-      .eq("user_id", STATIC_USER_ID)
-
-    if (error) {
-      console.error("Failed to update task in Supabase:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      })
-    }
-  } catch (e) {
-    console.error("Failed to update task in Supabase:", e)
-  }
-}
-
-async function updateTodoPomodorosInSupabase(id: string, completedPomodoros: number) {
-  try {
-    const { error } = await supabase
-      .from("todos")
-      .update({ completed_pomodoros: completedPomodoros })
-      .eq("id", id)
-      .eq("user_id", STATIC_USER_ID)
-    if (error) {
-      console.error("Failed to update task pomodoros in Supabase:", error.message)
-    }
-  } catch (e) {
-    console.error("Failed to update task pomodoros in Supabase:", e)
-  }
-}
-
-async function updateTaskCreatedAtInSupabase(id: string, createdAt: Date | null) {
-  try {
-    const { error } = await supabase
-      .from("todos")
-      .update({ created_at: createdAt ? createdAt.toISOString() : null })
-      .eq("id", id)
-      .eq("user_id", STATIC_USER_ID)
-    if (error) {
-      console.error("Failed to update task created_at in Supabase:", error.message)
-    }
-  } catch (e) {
-    console.error("Failed to update task created_at in Supabase:", e)
-  }
-}
-
-async function deleteTaskFromSupabase(id: string) {
-  try {
-    const { error } = await supabase
-      .from("todos")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", STATIC_USER_ID)
-
-    if (error) {
-      console.error("Failed to delete task in Supabase:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      })
-    }
-  } catch (e) {
-    console.error("Failed to delete task in Supabase:", e)
-  }
 }
 
 async function savePomodoroSessionToSupabase(todoId?: string) {
@@ -291,22 +166,6 @@ async function savePomodoroSessionToSupabase(todoId?: string) {
     }
   } catch (e) {
     console.error("Failed to save pomodoro session to Supabase:", e)
-  }
-}
-
-async function updateTaskOrderInSupabase(orderedIds: string[]) {
-  try {
-    await Promise.all(
-      orderedIds.map((id, index) =>
-        supabase
-          .from("todos")
-          .update({ sort_order: index })
-          .eq("id", id)
-          .eq("user_id", STATIC_USER_ID)
-      )
-    )
-  } catch (e) {
-    console.error("Failed to update task order in Supabase:", e)
   }
 }
 
@@ -359,57 +218,20 @@ async function loadTimerStateFromSupabase(): Promise<{
   }
 }
 
-async function loadTasksFromSupabase(): Promise<Task[] | null> {
-  try {
-    const { data, error } = await supabase
-      .from("todos")
-      .select("id,title,description,is_completed,estimated_pomodoros,completed_pomodoros,created_at,updated_at,completed_at,sort_order")
-      .eq("user_id", STATIC_USER_ID)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      console.error("Failed to load tasks from Supabase:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      })
-      return null
-    }
-
-    return (data ?? []).map((row) => {
-      const completed = !!row.is_completed
-      const completedAtRaw = row.completed_at ?? (completed ? row.updated_at : null)
-      return {
-        id: row.id,
-        name: row.title,
-        notes: row.description ?? undefined,
-        pomodoroCount: row.estimated_pomodoros ?? 1,
-        completedPomodoros: row.completed_pomodoros ?? 0,
-        completed,
-        completedAt: completedAtRaw ? new Date(completedAtRaw) : undefined,
-        createdAt: row.created_at ? new Date(row.created_at) : undefined,
-      }
-    })
-  } catch (e) {
-    console.error("Failed to load tasks from Supabase:", e)
-    return null
-  }
-}
-
-// Helper function to load tasks from localStorage
 function loadTasks(): Task[] {
   if (typeof window === "undefined") return defaultTasks
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      const parsed = JSON.parse(saved)
-      return parsed.map((task: Task) => ({
-        ...task,
-        completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
-        createdAt: task.createdAt ? new Date(task.createdAt) : undefined,
-      }))
+      const parsed = JSON.parse(saved) as unknown
+      if (!Array.isArray(parsed)) return defaultTasks
+      return parsed
+        .map((raw) =>
+          typeof raw === "object" && raw !== null
+            ? hydrateStoredTask(raw as Record<string, unknown>)
+            : null
+        )
+        .filter((t): t is Task => t != null && t.id.length > 0)
     }
   } catch (e) {
     console.error("Failed to load tasks:", e)
@@ -441,30 +263,98 @@ export default function PomodoroApp() {
   const timerRef = useRef<PomodoroTimerRef>(null)
   const mainRef = useRef<HTMLElement>(null)
 
-  // Load tasks from localStorage on mount (client-side only)
+  const syncFailStreakRef = useRef(0)
+  const [showOfflineSyncHint, setShowOfflineSyncHint] = useState(false)
+
+  const bumpSyncFailure = useCallback(() => {
+    syncFailStreakRef.current += 1
+    if (syncFailStreakRef.current >= 3) setShowOfflineSyncHint(true)
+  }, [])
+
+  const resetSyncFailure = useCallback(() => {
+    syncFailStreakRef.current = 0
+    setShowOfflineSyncHint(false)
+  }, [])
+
+  const flushUnsyncedTasks = useCallback(
+    async (snapshot?: Task[]) => {
+      const list = snapshot ?? tasksRef.current
+      const targets = list.filter((t) => t.is_synced === false)
+      if (targets.length === 0) return
+      let hadFailure = false
+      const succeeded = new Set<string>()
+      for (const t of targets) {
+        if (await upsertTaskToRemote(t)) succeeded.add(t.id)
+        else hadFailure = true
+      }
+      if (succeeded.size > 0) {
+        setTasks((prev) =>
+          prev.map((p) =>
+            succeeded.has(p.id) ? { ...p, is_synced: true, updatedAt: new Date() } : p
+          )
+        )
+      }
+      if (hadFailure) bumpSyncFailure()
+      else if (succeeded.size === targets.length) resetSyncFailure()
+    },
+    [bumpSyncFailure, resetSyncFailure]
+  )
+
+  const reconcileTasksWithRemote = useCallback(async () => {
+    const remote = await loadTasksFromRemote()
+    const local = tasksRef.current
+    const pending = loadPendingDeleteIds()
+    if (remote === null) {
+      bumpSyncFailure()
+      return
+    }
+    resetSyncFailure()
+    const merged = mergeTasksWithRemote(local, remote, pending)
+    setTasks(merged)
+    setSelectedTask((prev) => {
+      const stillExists = prev && merged.some((t) => t.id === prev.id)
+      if (stillExists) return merged.find((t) => t.id === prev!.id) ?? prev
+      return merged.find((t) => !t.completed && t.createdAt != null)
+    })
+    queueMicrotask(() => {
+      void flushUnsyncedTasks(merged)
+    })
+  }, [bumpSyncFailure, resetSyncFailure, flushUnsyncedTasks])
+
+  // 安全合并初始化：本地优先，按 updated_at 合并；再补推未同步任务
   useEffect(() => {
     let cancelled = false
 
     async function init() {
-      // 先从 Supabase 拉取（多端同步的来源）
-      const remoteTasks = await loadTasksFromSupabase()
-      const loadedTasks = remoteTasks ?? loadTasks()
-
-      if (cancelled) return
-      setTasks(loadedTasks)
-      const firstActiveTask = loadedTasks.find((t) => !t.completed && t.createdAt != null)
-      if (firstActiveTask) {
-        setSelectedTask(firstActiveTask)
+      const local = loadTasks()
+      const remote = await loadTasksFromRemote()
+      const pending = loadPendingDeleteIds()
+      let loaded: Task[]
+      if (remote === null) {
+        loaded = local
+        bumpSyncFailure()
+      } else {
+        resetSyncFailure()
+        loaded = mergeTasksWithRemote(local, remote, pending)
       }
+      if (cancelled) return
+      setTasks(loaded)
+      const firstActiveTask = loaded.find((t) => !t.completed && t.createdAt != null)
+      if (firstActiveTask) setSelectedTask(firstActiveTask)
       const timerState = await loadTimerStateFromSupabase()
       if (!cancelled && timerState) setRemoteTimer(timerState)
       setIsHydrated(true)
+      queueMicrotask(() => {
+        if (!cancelled) void flushUnsyncedTasks(loaded)
+      })
     }
 
     void init()
     return () => {
       cancelled = true
     }
+    // 仅挂载时做一次安全合并；依赖项刻意为空
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Save tasks to localStorage whenever they change (only after hydration)
@@ -477,28 +367,34 @@ export default function PomodoroApp() {
     }
   }, [tasks, isHydrated])
 
-  // 切回本页面时从云端拉取最新任务与计时状态，多端同步（无需刷新）
+  // 切回本页面：安全合并 + 计时状态
   useEffect(() => {
     if (!isHydrated) return
     const onVisible = () => {
       if (document.visibilityState !== "visible") return
-      loadTasksFromSupabase().then((remote) => {
-        if (remote && remote.length >= 0) {
-          setTasks(remote)
-          setSelectedTask((prev) => {
-            const stillExists = prev && remote.some((t) => t.id === prev.id)
-            if (stillExists) return remote.find((t) => t.id === prev!.id) ?? prev
-            return remote.find((t) => !t.completed && t.createdAt != null)
-          })
-        }
-      })
-      loadTimerStateFromSupabase().then((state) => setRemoteTimer(state))
+      void reconcileTasksWithRemote()
+      void loadTimerStateFromSupabase().then((state) => setRemoteTimer(state))
     }
     document.addEventListener("visibilitychange", onVisible)
     return () => document.removeEventListener("visibilitychange", onVisible)
-  }, [isHydrated])
+  }, [isHydrated, reconcileTasksWithRemote])
 
-  // Supabase Realtime：监听 todos 表变更，多端实时同步（电脑端添加/修改/删除后移动端自动更新）
+  // 未同步任务定时补推
+  useEffect(() => {
+    if (!isHydrated) return
+    const id = window.setInterval(() => {
+      if (tasksRef.current.some((t) => t.is_synced === false)) void flushUnsyncedTasks()
+    }, 40_000)
+    return () => clearInterval(id)
+  }, [isHydrated, flushUnsyncedTasks])
+
+  useEffect(() => {
+    const onOnline = () => void flushUnsyncedTasks()
+    window.addEventListener("online", onOnline)
+    return () => window.removeEventListener("online", onOnline)
+  }, [flushUnsyncedTasks])
+
+  // Supabase Realtime：todos 变更时安全合并（不直接覆盖本地）
   useEffect(() => {
     if (!isHydrated) return
     const channel = supabase
@@ -512,23 +408,14 @@ export default function PomodoroApp() {
           filter: `user_id=eq.${STATIC_USER_ID}`,
         },
         () => {
-          loadTasksFromSupabase().then((remote) => {
-            if (remote) {
-              setTasks(remote)
-              setSelectedTask((prev) => {
-                const stillExists = prev && remote.some((t) => t.id === prev.id)
-                if (stillExists) return remote.find((t) => t.id === prev!.id) ?? prev
-                return remote.find((t) => !t.completed && t.createdAt != null)
-              })
-            }
-          })
+          void reconcileTasksWithRemote()
         }
       )
       .subscribe()
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [isHydrated])
+  }, [isHydrated, reconcileTasksWithRemote])
 
   // Supabase Realtime：监听 timer_state，多端同步番茄计时
   useEffect(() => {
@@ -564,30 +451,47 @@ export default function PomodoroApp() {
   }, [])
 
   const handleToggleComplete = useCallback((id: string) => {
-    const task = tasks.find(t => t.id === id)
-    const willComplete = task && !task.completed
-    const newCompleted = task ? !task.completed : false
+    const cur = tasksRef.current.find((t) => t.id === id)
+    const newCompleted = cur ? !cur.completed : false
+    const willComplete = !!cur && !cur.completed
+    const nextPomodoros =
+      willComplete && cur && cur.completedPomodoros === 0
+        ? cur.pomodoroCount
+        : cur?.completedPomodoros ?? 0
 
-    setTasks((prev) =>
-      prev.map((task) =>
+    setTasks((prev) => {
+      const next = prev.map((task) =>
         task.id === id
           ? {
               ...task,
               completed: newCompleted,
               completedAt: newCompleted ? new Date() : undefined,
+              completedPomodoros: newCompleted ? nextPomodoros : task.completedPomodoros,
+              is_synced: false,
+              updatedAt: new Date(),
             }
           : task
       )
-    )
+      if (willComplete) {
+        const firstActive = next.find((t) => !t.completed && t.createdAt != null)
+        queueMicrotask(() => setSelectedTask(firstActive))
+      }
+      return next
+    })
 
-    // 同步到 Supabase，其他端刷新后能看到
-    void updateTodoCompleteInSupabase(id, newCompleted)
+    void updateTodoCompleteOnRemote(
+      id,
+      newCompleted,
+      newCompleted ? nextPomodoros : undefined
+    ).then((ok) => {
+      if (ok) {
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, is_synced: true } : t)))
+        resetSyncFailure()
+      } else bumpSyncFailure()
+    })
 
-    // Show celebration when completing a task
-    if (willComplete) {
-      setShowCelebration(true)
-    }
-  }, [tasks])
+    if (willComplete) setShowCelebration(true)
+  }, [bumpSyncFailure, resetSyncFailure])
 
   const handleDeleteRequest = useCallback((id: string) => {
     setDeleteConfirm({ isOpen: true, taskId: id })
@@ -596,25 +500,34 @@ export default function PomodoroApp() {
   const handleConfirmDelete = useCallback(() => {
     if (deleteConfirm.taskId) {
       const idToDelete = deleteConfirm.taskId
+      addPendingDeleteId(idToDelete)
       setTasks((prev) => prev.filter((task) => task.id !== idToDelete))
       setSelectedTask((prev) => (prev?.id === idToDelete ? undefined : prev))
-      void deleteTaskFromSupabase(idToDelete)
+      void deleteTaskFromRemote(idToDelete).then((ok) => {
+        if (ok) removePendingDeleteId(idToDelete)
+        else bumpSyncFailure()
+      })
       toast({
         description: "已删除",
         className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto min-w-0 bg-foreground/80 text-background text-sm font-medium px-6 py-2.5 rounded-full shadow-lg backdrop-blur-sm border-0",
       })
     }
     setDeleteConfirm({ isOpen: false, taskId: null })
-  }, [deleteConfirm.taskId])
+  }, [deleteConfirm.taskId, bumpSyncFailure])
 
   const handleCancelDelete = useCallback(() => {
     setDeleteConfirm({ isOpen: false, taskId: null })
   }, [])
 
   const handleReorder = useCallback((newTasks: Task[]) => {
-    setTasks(newTasks)
+    setTasks(
+      newTasks.map((t, i) => ({
+        ...t,
+        sortOrder: i,
+      }))
+    )
     const orderedIds = newTasks.map((t) => t.id)
-    void updateTaskOrderInSupabase(orderedIds)
+    void updateTaskOrderOnRemote(orderedIds)
   }, [])
 
   const handleSelectTask = useCallback((task: Task) => {
@@ -630,22 +543,25 @@ export default function PomodoroApp() {
 
   const handleAddTask = useCallback((name: string, pomodoroCount: number, notes?: string, isToday = true) => {
     if (editingTask) {
-      const updatedTask = { ...editingTask, name, pomodoroCount, notes }
-      setTasks((prev) =>
-        prev.map((task) =>
+      const updatedTask: Task = {
+        ...editingTask,
+        name,
+        pomodoroCount,
+        notes,
+        is_synced: false,
+        updatedAt: new Date(),
+      }
+      setTasks((prev) => {
+        const next = prev.map((task) =>
           task.id === editingTask.id ? updatedTask : task
         )
-      )
+        queueMicrotask(() => void flushUnsyncedTasks(next))
+        return next
+      })
       if (selectedTask?.id === editingTask.id) {
         setSelectedTask(updatedTask)
       }
       setEditingTask(null)
-      void updateTaskInSupabase(updatedTask, (msg) =>
-        toast({
-          description: `同步到云端失败：${msg}`,
-          variant: "destructive",
-        })
-      )
       return
     }
     const newTask: Task = {
@@ -656,24 +572,23 @@ export default function PomodoroApp() {
       completedPomodoros: 0,
       completed: false,
       createdAt: isToday ? new Date() : undefined,
+      is_synced: false,
+      updatedAt: new Date(),
     }
     setTasks((prev) => {
       const active = prev.filter((t) => !t.completed && t.createdAt != null)
       const completed = prev.filter((t) => t.completed)
       const future = prev.filter((t) => !t.completed && t.createdAt == null)
-      if (isToday) return [...active, newTask, ...completed, ...future]
-      return [...active, ...completed, newTask, ...future]
+      const next = isToday
+        ? [...active, newTask, ...completed, ...future]
+        : [...active, ...completed, newTask, ...future]
+      queueMicrotask(() => void flushUnsyncedTasks(next))
+      return next
     })
     toast({
       description: "已创建",
       className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto min-w-0 bg-foreground/80 text-background text-sm font-medium px-6 py-2.5 rounded-full shadow-lg backdrop-blur-sm border-0",
     })
-    void saveTaskToSupabase(newTask, (msg) =>
-      toast({
-        description: `任务已保存到本地，但同步到云端失败：${msg}`,
-        variant: "destructive",
-      })
-    )
     if (isToday && !selectedTask) {
       setSelectedTask(newTask)
     }
@@ -682,7 +597,7 @@ export default function PomodoroApp() {
         mainRef.current?.scrollTo({ top: mainRef.current.scrollHeight, behavior: "smooth" })
       }, 150)
     }
-  }, [selectedTask, editingTask])
+  }, [selectedTask, editingTask, flushUnsyncedTasks])
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false)
@@ -690,24 +605,41 @@ export default function PomodoroApp() {
   }, [])
 
   const handleMoveToFuture = useCallback((id: string) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, createdAt: undefined } : t)))
-    void updateTaskCreatedAtInSupabase(id, null)
-  }, [])
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, createdAt: undefined, is_synced: false, updatedAt: new Date() }
+          : t
+      )
+    )
+    void updateTodoCreatedAtOnRemote(id, null).then((ok) => {
+      if (ok) setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, is_synced: true } : t)))
+      else bumpSyncFailure()
+    })
+  }, [bumpSyncFailure])
 
   const handleAddToToday = useCallback((id: string) => {
     const now = new Date()
     setTasks((prev) => {
       const task = prev.find((t) => t.id === id)
       if (!task) return prev
-      const updated = { ...task, createdAt: now }
+      const updated: Task = {
+        ...task,
+        createdAt: now,
+        is_synced: false,
+        updatedAt: now,
+      }
       const rest = prev.filter((t) => t.id !== id)
       const active = rest.filter((t) => !t.completed && t.createdAt != null)
       const completed = rest.filter((t) => t.completed)
       const future = rest.filter((t) => !t.completed && t.createdAt == null)
       return [...active, updated, ...completed, ...future]
     })
-    void updateTaskCreatedAtInSupabase(id, now)
-  }, [])
+    void updateTodoCreatedAtOnRemote(id, now).then((ok) => {
+      if (ok) setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, is_synced: true } : t)))
+      else bumpSyncFailure()
+    })
+  }, [bumpSyncFailure])
 
   const handleAdoptToLocal = useCallback(() => {
     if (!remoteTimer) return
@@ -726,10 +658,24 @@ export default function PomodoroApp() {
         const newCount = task.completedPomodoros + 1
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === taskId ? { ...t, completedPomodoros: newCount } : t
+            t.id === taskId
+              ? {
+                  ...t,
+                  completedPomodoros: newCount,
+                  is_synced: false,
+                  updatedAt: new Date(),
+                }
+              : t
           )
         )
-        void updateTodoPomodorosInSupabase(taskId, newCount)
+        void updateTodoPomodorosOnRemote(taskId, newCount).then((ok) => {
+          if (ok) {
+            setTasks((prev) =>
+              prev.map((t) => (t.id === taskId ? { ...t, is_synced: true } : t))
+            )
+            resetSyncFailure()
+          } else bumpSyncFailure()
+        })
         void savePomodoroSessionToSupabase(taskId)
       }
       void clearTimerStateInSupabase()
@@ -739,7 +685,7 @@ export default function PomodoroApp() {
       void clearTimerStateInSupabase()
       timerRef.current?.switchToShortBreak()
     }
-  }, [selectedTask?.id])
+  }, [selectedTask?.id, bumpSyncFailure, resetSyncFailure])
 
   // Get today's date at midnight for filtering
   const today = new Date()
@@ -761,6 +707,19 @@ export default function PomodoroApp() {
 
   return (
     <div className="min-h-[100dvh] relative pt-[env(safe-area-inset-top,0px)]">
+      {isHydrated && showOfflineSyncHint ? (
+        <div
+          className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[60] pointer-events-none"
+          title="当前为离线模式，数据暂存本地"
+        >
+          <AlertCircle
+            className="h-3.5 w-3.5 text-amber-600/85 drop-shadow-sm"
+            strokeWidth={2.25}
+            aria-hidden
+          />
+          <span className="sr-only">当前为离线模式，数据暂存本地</span>
+        </div>
+      ) : null}
       {/* 全屏背景 - radial-gradient 蓝粉光晕，铺满视口含刘海区 */}
       <div
         className="fixed left-0 right-0 bottom-0 z-0"
@@ -802,18 +761,8 @@ export default function PomodoroApp() {
                 onTimerStop={() => clearTimerStateInSupabase()}
                 onAdoptToLocal={handleAdoptToLocal}
                 onRequestSync={async () => {
-                  const [timerState, remoteTasks] = await Promise.all([
-                    loadTimerStateFromSupabase(),
-                    loadTasksFromSupabase(),
-                  ])
-                  if (remoteTasks) {
-                    setTasks(remoteTasks)
-                    setSelectedTask((prev) => {
-                      const stillExists = prev && remoteTasks.some((t) => t.id === prev.id)
-                      if (stillExists) return remoteTasks.find((t) => t.id === prev!.id) ?? prev
-                      return remoteTasks.find((t) => !t.completed && t.createdAt != null)
-                    })
-                  }
+                  const timerState = await loadTimerStateFromSupabase()
+                  await reconcileTasksWithRemote()
                   setRemoteTimer(timerState)
                 }}
               />

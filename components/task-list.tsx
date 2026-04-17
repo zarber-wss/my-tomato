@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react"
 import { MoreVertical, ArrowUpDown, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { TaskActionsSheet } from "@/components/task-actions-sheet"
+import { LinkifiedText } from "@/components/linkified-text"
 
 export interface Task {
   id: string
@@ -15,6 +16,12 @@ export interface Task {
   completedAt?: Date
   /** 有值表示今日待办，null/undefined 表示未来待办 */
   createdAt?: Date | null
+  /** 本地修改后未成功写入 Supabase 时为 false；云端拉取或 upsert 成功为 true */
+  is_synced?: boolean
+  /** 用于与云端 updated_at 比对合并；本地编辑时应更新 */
+  updatedAt?: Date
+  /** 与 Supabase sort_order 对应，用于合并后排序 */
+  sortOrder?: number
 }
 
 interface TaskListProps {
@@ -254,8 +261,8 @@ export function TaskList({
         )}
       >
         <div className="flex items-center gap-1 min-h-[2.5rem]">
-          <div className="flex-1 min-w-0 pr-0.5 flex items-center">
-            <div>
+          <div className="flex min-w-0 flex-1 items-center pr-0.5">
+            <div className="min-w-0 max-w-full">
               <p className={cn(
                 "font-medium break-words leading-normal",
                 isCompleted ? "text-black" : "text-stone-800"
@@ -264,10 +271,10 @@ export function TaskList({
               </p>
               {hasNotes && (
                 <p className={cn(
-                  "text-sm mt-1 whitespace-pre-wrap break-words leading-normal",
+                  "mt-1 max-w-full text-sm leading-normal whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
                   isCompleted ? "text-stone-600" : "text-stone-500"
                 )}>
-                  {task.notes}
+                  <LinkifiedText text={task.notes!} />
                 </p>
               )}
             </div>
@@ -404,7 +411,9 @@ export function TaskList({
                     <div className="flex-1 min-w-0">
                       <p className="font-medium break-words text-foreground">{task.name}</p>
                       {task.notes?.trim() && (
-                        <p className="text-sm text-foreground/60 mt-1 line-clamp-2">{task.notes}</p>
+                        <p className="mt-1 max-w-full line-clamp-2 text-sm text-foreground/60 break-words [overflow-wrap:anywhere]">
+                          <LinkifiedText text={task.notes} />
+                        </p>
                       )}
                     </div>
                     <div className="text-sm text-foreground/60 flex-shrink-0">
@@ -457,8 +466,8 @@ export function TaskList({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium break-words text-foreground">{task.name}</p>
                     {task.notes?.trim() && (
-                      <p className="text-sm text-foreground/60 mt-1 line-clamp-2 overflow-hidden text-ellipsis whitespace-pre-wrap break-words">
-                        {task.notes}
+                      <p className="mt-1 max-w-full line-clamp-2 overflow-hidden text-ellipsis whitespace-pre-wrap break-words text-sm text-foreground/60 [overflow-wrap:anywhere]">
+                        <LinkifiedText text={task.notes} />
                       </p>
                     )}
                   </div>

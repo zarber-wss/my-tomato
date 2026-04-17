@@ -3,9 +3,19 @@
 import { useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { Task } from "./task-list"
+import { LinkifiedText } from "@/components/linkified-text"
 
 interface HistorySectionProps {
   tasks: Task[]
+}
+
+const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const
+
+/** 与日历格子一致：0=周日 … 6=周六 */
+function formatWeekdayCN(date: Date): string {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return WEEKDAY_LABELS[d.getDay()]
 }
 
 function formatDate(date: Date): string {
@@ -40,8 +50,8 @@ function getDateKey(date: Date): string {
   return `${y}-${m}-${day}`
 }
 
-function groupTasksByDate(tasks: Task[]): Map<string, { displayDate: string; tasks: Task[] }> {
-  const groups = new Map<string, { displayDate: string; tasks: Task[] }>()
+function groupTasksByDate(tasks: Task[]): Map<string, { displayDate: string; weekdayLabel: string; tasks: Task[] }> {
+  const groups = new Map<string, { displayDate: string; weekdayLabel: string; tasks: Task[] }>()
   const todayKey = getDateKey(new Date())
 
   tasks
@@ -58,11 +68,12 @@ function groupTasksByDate(tasks: Task[]): Map<string, { displayDate: string; tas
     .forEach((task) => {
       const dateKey = getDateKey(task.completedAt!)
       const displayDate = formatDate(task.completedAt!)
+      const weekdayLabel = formatWeekdayCN(task.completedAt!)
       const existing = groups.get(dateKey)
       if (existing) {
         existing.tasks.push(task)
       } else {
-        groups.set(dateKey, { displayDate, tasks: [task] })
+        groups.set(dateKey, { displayDate, weekdayLabel, tasks: [task] })
       }
     })
   
@@ -229,11 +240,12 @@ export function HistorySection({ tasks }: HistorySectionProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {Array.from(groupedTasks.entries()).map(([dateKey, { displayDate, tasks: dateTasks }]) => (
+          {Array.from(groupedTasks.entries()).map(([dateKey, { displayDate, weekdayLabel, tasks: dateTasks }]) => (
             <div key={dateKey} className="bg-card rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
               {/* Date Header */}
-              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                {displayDate}
+              <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground">
+                <span>{displayDate}</span>
+                <span className="ml-1.5 opacity-90">{weekdayLabel}</span>
               </p>
               
               {/* Tasks List */}
@@ -249,8 +261,8 @@ export function HistorySection({ tasks }: HistorySectionProps) {
                           {task.name}
                         </p>
                         {task.notes && (
-                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words">
-                            {task.notes}
+                          <p className="mt-1 max-w-full text-sm whitespace-pre-wrap break-words text-muted-foreground [overflow-wrap:anywhere]">
+                            <LinkifiedText text={task.notes} />
                           </p>
                         )}
                       </div>

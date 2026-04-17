@@ -1,6 +1,7 @@
 "use client"
 
 import type { Task } from "@/components/task-list"
+import { LinkifiedText } from "@/components/linkified-text"
 
 interface TaskActionsSheetProps {
   isOpen: boolean
@@ -71,8 +72,8 @@ export function TaskActionsSheet({
         <div className="px-6 pb-4 border-b border-border/30 flex-shrink-0">
           <h2 className="text-xl font-bold text-foreground">{task.name}</h2>
           {task.notes && task.notes.trim() ? (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 overflow-hidden text-ellipsis whitespace-pre-wrap break-words">
-              {task.notes}
+            <p className="mt-1 max-w-full line-clamp-2 overflow-hidden text-ellipsis whitespace-pre-wrap break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
+              <LinkifiedText text={task.notes} />
             </p>
           ) : null}
         </div>
